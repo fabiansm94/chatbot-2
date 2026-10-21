@@ -1,4 +1,11 @@
 node_modules/
 functions/lib/
+dist/
+dist/
+.env
+.env.local
+*.env*
 *.log
 server.log
+.aistudio/
+.vercel/

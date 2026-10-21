@@ -1,0 +1,6 @@
+{
+  "name": "ManualBot - Asistente de Manuales Internos",
+  "description": "Chatbot corporativo con Gemini conectado al Book de manuales internos, políticas y procedimientos de la empresa para resolver dudas de empleados.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
