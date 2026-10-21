@@ -1,0 +1,7 @@
+node_modules/
+functions/lib/
+*.log
+server.log
+
+# Proyectos independientes con su propio historial git
+my-custom-video-editor/
