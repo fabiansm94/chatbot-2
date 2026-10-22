@@ -116,7 +116,7 @@ export default function App() {
     }
   }, [messages]);
 
-  const handleSendMessage = async (text: string, tone: 'direct' | 'detailed' | 'steps') => {
+  const handleSendMessage = async (text: string) => {
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -136,7 +136,6 @@ export default function App() {
           message: text,
           history: newMessages.slice(-6),
           manuals,
-          tone,
           companyName
         })
       });
@@ -151,6 +150,7 @@ export default function App() {
         role: 'assistant',
         content: data.text || 'No he podido generar una respuesta en este momento.',
         citations: data.citations || [],
+        grounded: data.grounded,
         timestamp: Date.now()
       };
 
@@ -204,13 +204,13 @@ export default function App() {
   const handleAskAboutSection = (section: ManualSection, manual: ManualDocument) => {
     const query = `¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`;
     setActiveTab('chat');
-    handleSendMessage(query, 'direct');
+    handleSendMessage(query);
   };
 
   const handleAskAboutManual = (manual: ManualDocument) => {
     const query = `¿Cuáles son los temas, derechos y obligaciones principales que contempla el ${manual.title} (${manual.code})?`;
     setActiveTab('chat');
-    handleSendMessage(query, 'direct');
+    handleSendMessage(query);
   };
 
   const handleAddManual = (newManual: ManualDocument) => {

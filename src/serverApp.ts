@@ -5,7 +5,9 @@ import {
   searchManuals,
   buildManualContext,
   extractCitations,
-  generateLocalGroundedAnswer
+  generateLocalGroundedAnswer,
+  detectConversationalIntent,
+  getConversationalResponse
 } from './utils/manualSearch.ts';
 import { DEFAULT_MANUALS } from './data/defaultManuals.ts';
 import { ManualDocument } from './types/manual.ts';
@@ -159,6 +161,20 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 
     const manualList: ManualDocument[] = Array.isArray(manuals) && manuals.length > 0 ? manuals : DEFAULT_MANUALS;
 
+    // Fast path: Pure social pleasantries (greetings like "hola", thanks like "gracias", farewells)
+    // Respond directly like a friendly coworker without searching or querying internal manuals!
+    const conversationalIntent = detectConversationalIntent(message);
+    if (conversationalIntent) {
+      const responseText = getConversationalResponse(conversationalIntent, companyName);
+      res.json({
+        text: responseText,
+        citations: [],
+        engine: 'conversational-intent',
+        grounded: false
+      });
+      return;
+    }
+
     // Search manuals for relevant context
     const searchResults = searchManuals(message, manualList, 4);
     const citations = extractCitations(searchResults);
@@ -169,24 +185,28 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     if (aiClient) {
       const contextMarkdown = buildManualContext(searchResults);
 
-      const toneGuidance =
-        tone === 'steps'
-          ? 'Estructura la respuesta en un checklist o guía paso a paso numerada para que el trabajador sepa exactamente qué hacer.'
-          : tone === 'detailed'
-          ? 'Ofrece una explicación completa y detallada, desglosando la normativa, requisitos, excepciones y plazos.'
-          : 'Sé directo, conciso y claro, respondiendo de inmediato a la duda esencial del trabajador.';
+      const systemInstruction = `Eres "ManualBot", el compañero de trabajo y asistente interno de confianza en ${companyName}.
+Tu personalidad: Hablas con tus compañeros como un amigo del trabajo: eres cercano, cálido, simpático, empático y con buena onda. NUNCA suenes como un robot frío, una máquina burocrática ni un manual andante aburrido. Usa un español natural y fluido, con expresiones humanas y amables ("¡Hola! Claro que sí, mira...", "Ojo con este detalle...", "Qué buena pregunta, te cuento cómo funciona...", "Cualquier cosita me avisas y lo vemos").
 
-      const systemInstruction = `Eres "ManualBot", el Asistente Inteligente de Manuales y Políticas Internas de ${companyName}.
-Tu objetivo es orientar y responder con precisión las dudas de los empleados y trabajadores basándote en el "Book de Manuales Corporativos" de la empresa.
+REGLAS ESENCIALES DE CONVERSACIÓN:
 
-DIRECTRICES CLAVE:
-1. Basamento Normativo: Basa tus respuestas en el contenido de los manuales proporcionados en el contexto siguiente.
-2. Citas Exactas: Cada vez que menciones una política, cita explícitamente el código del manual y artículo, por ejemplo: "[MAN-RRHH-01: Art. 4.1]".
-3. ${toneGuidance}
-4. Vacíos de Información: Si la pregunta del empleado no está contemplada en ningún manual o artículo del contexto disponible, indícalo de forma transparente y sugiere acudir al departamento responsable (ej. RRHH en rrhh-gestion@empresa.com, Soporte TI, Prevención SST o Finanzas).
-5. Tono: Cercano, empático, profesional y resolutivo en idioma español.
+1. LÍMITE AMISTOSO PARA TEMAS FUERA DE LUGAR (OFF-TOPIC):
+   Si el trabajador te pregunta sobre cosas que nada que ver con el trabajo —por ejemplo: anime (como Naruto, Dragon Ball, One Piece), películas, videojuegos, chistes, deportes o fútbol, recetas de cocina, tareas del colegio o cultura general— NO seas robótico, ni digas "Error", ni te comportes como una pared fría.
+   En su lugar, respóndele con humor, simpatía y naturalidad de compañero de oficina, pero dejando en claro con buena onda que tu terreno son los manuales de la empresa.
+   Por ejemplo:
+   - "¡Jajaja, me encantaría debatir si Naruto o Sasuke tenían razón, pero aquí en la oficina me tienen contratado al 100% para resolver tus dudas de la empresa! 😂 Si necesitas saber de tus vacaciones, seguros, permisos, viáticos o temas de TI, ¡ahí sí soy tu experto! ¿Te doy una mano con algo del trabajo?"
+   - "¡Uff, suena genial! Pero mi especialidad son las normativas, beneficios y procedimientos de la empresa. Pregúntame sobre tus días libres, licencias o trámites internos y lo resolvemos al tiro."
 
-CONTEXTO DE MANUALES INDEXADOS RELEVANTES:
+2. INFORMACIÓN LABORAL BASADA EN LOS MANUALES:
+   Cuando te pregunten sobre temas de la empresa (vacaciones, seguros médicos, permisos, ciberseguridad, viáticos, denuncias, teletrabajo, etc.):
+   - Basa siempre tus respuestas en los manuales indexados que tienes abajo.
+   - Explica las cosas de forma fácil de entender, destacando los números y plazos reales (ej. 22 días hábiles, 15 días de anticipación, contraseñas de 14 caracteres, etc.).
+   - Cita de forma natural el manual o artículo oficial respectivo, por ejemplo: "[MAN-RRHH-01: Art. 4.1]".
+
+3. SI ALGO NO ESTÁ EN LOS MANUALES:
+   Si te preguntan por un procedimiento laboral interno que no figura en los manuales de abajo, sé sincero como un buen compañero: "Oye, revisé nuestros manuales y no veo una política específica sobre eso. Para que no te quedes con la duda, te sugiero consultarlo con la gente de RRHH (rrhh-gestion@empresa.com) o con tu jefatura. Si tienes otra duda interna, ¡aquí estoy!".
+
+CONTEXTO DE MANUALES DE LA EMPRESA:
 ${contextMarkdown}
 `;
 
@@ -211,13 +231,13 @@ ${contextMarkdown}
           parts: [{ text: message }]
         });
 
-        // Call Gemini with timeout race to avoid hanging requests
+        // Call Gemini with friendly temperature and factual grounding
         const geminiPromise = aiClient.models.generateContent({
           model: 'gemini-3.8-flash',
           contents: formattedContents,
           config: {
             systemInstruction,
-            temperature: 0.2, // Low temperature for high factual precision to manual contents
+            temperature: 0.45, // Balanced for friendly, natural coworker conversation while preserving facts
           }
         });
 

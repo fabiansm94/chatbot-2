@@ -20,7 +20,7 @@ import { ChatMessage, Citation, ManualDocument, ManualSection } from '../types/m
 interface ChatViewProps {
   messages: ChatMessage[];
   isLoading: boolean;
-  onSendMessage: (text: string, tone: 'direct' | 'detailed' | 'steps') => void;
+  onSendMessage: (text: string) => void;
   onClearChat: () => void;
   onOpenCitation: (citation: Citation) => void;
   companyName: string;
@@ -41,7 +41,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onOpenProposeModal
 }) => {
   const [inputText, setInputText] = useState('');
-  const [tone, setTone] = useState<'direct' | 'detailed' | 'steps'>('direct');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackState, setFeedbackState] = useState<Record<string, 'up' | 'down'>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -59,7 +58,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (!inputText.trim() || isLoading) return;
     const text = inputText.trim();
     setInputText('');
-    onSendMessage(text, tone);
+    onSendMessage(text);
   };
 
   const handleCopyMessage = (id: string, text: string) => {
@@ -107,45 +106,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] max-w-5xl mx-auto px-4 sm:px-6 w-full">
-      {/* Top Banner & Tone Control */}
+      {/* Top Bar Status */}
       <div className="py-3 border-b border-slate-800/80 flex items-center justify-between gap-3 shrink-0 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400">Estilo de respuesta:</span>
-          <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
-            <button
-              type="button"
-              onClick={() => setTone('direct')}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                tone === 'direct'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Directo & Ágil
-            </button>
-            <button
-              type="button"
-              onClick={() => setTone('steps')}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                tone === 'steps'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Paso a Paso
-            </button>
-            <button
-              type="button"
-              onClick={() => setTone('detailed')}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                tone === 'detailed'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Normativa Detallada
-            </button>
-          </div>
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Compañero activo • {companyName}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -186,10 +151,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
             <div className="space-y-2">
               <h2 className="text-2xl font-bold text-white tracking-tight">
-                ¡Hola! Soy tu Asistente de Manuales Internos
+                ¡Hola! Soy tu compañero para dudas de la empresa
               </h2>
               <p className="text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
-                Tengo indexado el <strong>Book Oficial de {companyName}</strong> (RRHH, Ciberseguridad, SST, Código de Ética y Operaciones). Pregúntame sobre cualquier duda laboral o procedimiento.
+                Tengo aprendidos todos los manuales y políticas de <strong>{companyName}</strong>. Pregúntame con confianza sobre tus vacaciones, permisos, seguros, beneficios o normas internas. ¡Estoy aquí para darte una mano!
               </p>
             </div>
 
@@ -205,7 +170,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => onSendMessage(item.query, tone)}
+                    onClick={() => onSendMessage(item.query)}
                     className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-850 text-left transition-all group flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -247,10 +212,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 {msg.role === 'assistant' && (
                   <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
                     <div className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-[11px] font-medium text-slate-400">
-                        Fundamentado en el Book de la Empresa
-                      </span>
+                      {msg.citations && msg.citations.length > 0 ? (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-[11px] font-medium text-slate-400">
+                            Fundamentado en el Book de la Empresa
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span className="text-[11px] font-medium text-slate-400">
+                            ManualBot • Compañero de Trabajo
+                          </span>
+                        </>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -350,7 +326,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
             <div className="px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs text-slate-400">
               <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
-              <span>Consultando el Book de manuales internos...</span>
+              <span>Escribiendo respuesta...</span>
             </div>
           </div>
         )}
@@ -363,7 +339,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
           <input
             type="text"
-            placeholder="Pregunta sobre vacaciones, ciberseguridad, permisos..."
+            placeholder="Pregúntame con confianza sobre vacaciones, permisos, seguros, TI..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             disabled={isLoading}

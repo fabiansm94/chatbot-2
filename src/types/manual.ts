@@ -48,6 +48,7 @@ export interface ChatMessage {
   timestamp: number;
   citations?: Citation[];
   error?: boolean;
+  grounded?: boolean;
   queriedManuals?: string[];
   matchedCount?: number;
 }

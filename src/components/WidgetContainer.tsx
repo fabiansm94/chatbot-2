@@ -129,9 +129,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
               <BookOpen className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-white">¿En qué procedimiento te ayudo?</h3>
+              <h3 className="font-bold text-sm text-white">¿En qué te doy una mano hoy?</h3>
               <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
-                Consulta sobre vacaciones, permisos, ciberseguridad, viáticos y reglamentos de la empresa.
+                Pregúntame con confianza sobre tus vacaciones, permisos, seguros, beneficios o temas de la empresa.
               </p>
             </div>
 
@@ -168,8 +168,17 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
               >
                 {msg.role === 'assistant' && (
                   <div className="flex items-center gap-1 text-[10px] text-slate-400 pb-1 border-b border-slate-800">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    <span>Book Oficial</span>
+                    {msg.citations && msg.citations.length > 0 ? (
+                      <>
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span>Book Oficial</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span>ManualBot</span>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -204,7 +213,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
         {isLoading && (
           <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400">
             <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
-            <span>Consultando manuales...</span>
+            <span>Escribiendo...</span>
           </div>
         )}
 
