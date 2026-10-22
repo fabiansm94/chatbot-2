@@ -19,7 +19,8 @@ import {
   ArrowRight,
   MessageCircle,
   HelpCircle,
-  MoreVertical
+  MoreVertical,
+  LogOut
 } from 'lucide-react';
 import { ChatMessage, Citation, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
 import { BOT_PROFILE, USER_PROFILE, getUserProfile, RenderAvatar, AvatarProfile } from '../data/avatars';
@@ -38,6 +39,7 @@ interface ChatViewProps {
   onOpenProposeModal?: () => void;
   onOpenSection?: (section: ManualSection, manual: ManualDocument) => void;
   loggedUserName?: string;
+  onLogout?: () => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -50,7 +52,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onOpenCitation,
   companyName,
   onOpenProposeModal,
-  loggedUserName
+  loggedUserName,
+  onLogout
 }) => {
   const [inputText, setInputText] = useState('');
   const [sidebarSearch, setSidebarSearch] = useState('');
@@ -340,6 +343,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Limpiar Mi Chat</span>
+                  </button>
+                )}
+                {onLogout && (
+                  <button
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full px-3.5 py-2 text-left hover:bg-rose-900/30 text-rose-400 flex items-center gap-2 border-t border-[#333333] text-xs font-semibold"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Cerrar Sesión</span>
                   </button>
                 )}
               </div>

@@ -150,6 +150,8 @@ export default function App() {
     return localStorage.getItem('manualbot_logged_user_name_v1') || '';
   });
 
+  const isFabian = loggedUserName.trim().toLowerCase() === 'fabian';
+
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
@@ -184,6 +186,13 @@ export default function App() {
     if (userName.trim().toLowerCase() !== 'fabian') {
       setActiveTab('chat');
     }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setShowLoginModal(true);
+    setLoggedUserName('');
+    localStorage.removeItem('manualbot_logged_user_name_v1');
   };
 
   const handleSendMessage = async (text: string) => {
@@ -357,13 +366,15 @@ export default function App() {
       {/* Floating Card Window matching reference image */}
       <div className="w-full max-w-7xl h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)] lg:h-[calc(100vh-3rem)] bg-[#242424] rounded-[24px] sm:rounded-[32px] shadow-2xl overflow-hidden flex border border-[#333333]">
         {/* 1. Left Slim Rail (Coral Gradient) */}
-        <LeftRail
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          pendingApprovalsCount={pendingApprovalsCount}
-          totalManuals={manuals.length}
-          loggedUserName={loggedUserName}
-        />
+        {isFabian && (
+          <LeftRail
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            pendingApprovalsCount={pendingApprovalsCount}
+            totalManuals={manuals.length}
+            loggedUserName={loggedUserName}
+          />
+        )}
 
         {/* 2. Main View Area */}
         <main className="flex-1 flex overflow-hidden bg-[#242424] min-w-0 min-h-0 h-full">
@@ -382,6 +393,7 @@ export default function App() {
               onOpenProposeModal={() => setProposeModalOpen(true)}
               onOpenSection={handleOpenSection}
               loggedUserName={loggedUserName}
+              onLogout={handleLogout}
             />
           )}
 

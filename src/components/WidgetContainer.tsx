@@ -106,6 +106,13 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     }
   };
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setShowLoginModal(true);
+    setLoggedUserName('');
+    localStorage.removeItem('manualbot_widget_logged_user_v1');
+  };
+
   // Drawer & Modal state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerManual, setDrawerManual] = useState<ManualDocument | null>(null);
@@ -281,13 +288,15 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     <div className="w-full h-screen max-h-screen bg-[#1a1a1a] text-slate-200 flex overflow-hidden font-sans">
       {showLoginModal && <LoginModal onLogin={handleLogin} />}
 
-      <LeftRail
-        activeTab={activeTab as any}
-        setActiveTab={setActiveTab as any}
-        pendingApprovalsCount={pendingApprovalsCount}
-        totalManuals={manuals.length}
-        loggedUserName={loggedUserName}
-      />
+      {isFabian && (
+        <LeftRail
+          activeTab={activeTab as any}
+          setActiveTab={setActiveTab as any}
+          pendingApprovalsCount={pendingApprovalsCount}
+          totalManuals={manuals.length}
+          loggedUserName={loggedUserName}
+        />
+      )}
       
       <main className="flex-1 flex overflow-hidden bg-[#242424] w-full h-full">
         {activeTab === 'chat' && (
@@ -305,6 +314,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
             onOpenProposeModal={() => setProposeModalOpen(true)}
             onOpenSection={handleOpenSection}
             loggedUserName={loggedUserName}
+            onLogout={handleLogout}
           />
         )}
 
