@@ -304,6 +304,13 @@ export default function App() {
     setManuals(prev => [newManual, ...prev]);
   };
 
+  const handleDeleteManual = (manualId: string) => {
+    if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento?')) {
+      setManuals(prev => prev.filter(m => m.id !== manualId));
+      showToast('Manual eliminado correctamente.');
+    }
+  };
+
   const handleResetManuals = () => {
     if (window.confirm('¿Deseas restablecer el Book a los Procedimientos de Control y Monitoreo estándar?')) {
       setManuals(DEFAULT_MANUALS);
@@ -407,6 +414,7 @@ export default function App() {
               onOpenAddModal={() => setAddModalOpen(true)}
               onResetManuals={handleResetManuals}
               onAskAboutManual={handleAskAboutManual}
+              onDeleteManual={handleDeleteManual}
             />
           )}
 

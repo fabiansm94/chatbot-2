@@ -15,7 +15,8 @@ import {
   ExternalLink,
   RotateCcw,
   Sparkles,
-  Tag
+  Tag,
+  Trash2
 } from 'lucide-react';
 import { ManualCategory, ManualDocument, ManualSection } from '../types/manual';
 
@@ -25,6 +26,7 @@ interface ManualsBookViewProps {
   onOpenAddModal: () => void;
   onResetManuals: () => void;
   onAskAboutManual: (manual: ManualDocument) => void;
+  onDeleteManual?: (manualId: string) => void;
 }
 
 export const ManualsBookView: React.FC<ManualsBookViewProps> = ({
@@ -32,7 +34,8 @@ export const ManualsBookView: React.FC<ManualsBookViewProps> = ({
   onOpenSection,
   onOpenAddModal,
   onResetManuals,
-  onAskAboutManual
+  onAskAboutManual,
+  onDeleteManual
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,6 +236,18 @@ export const ManualsBookView: React.FC<ManualsBookViewProps> = ({
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                   </button>
+                  {onDeleteManual && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteManual(manual.id);
+                      }}
+                      className="p-2 rounded-lg bg-[#1a1a1a] hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 transition-colors border border-[#333333]"
+                      title="Eliminar manual"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <div className="p-1 rounded-lg text-slate-500">
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </div>

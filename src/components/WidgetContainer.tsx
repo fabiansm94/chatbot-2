@@ -256,6 +256,13 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     setManuals(prev => [newManual, ...prev]);
   };
 
+  const handleDeleteManual = (manualId: string) => {
+    if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento?')) {
+      setManuals(prev => prev.filter(m => m.id !== manualId));
+      showToast('Manual eliminado correctamente.');
+    }
+  };
+
   const handleResetManuals = () => {
     if (window.confirm('¿Deseas restablecer el Book a los Procedimientos estándar?')) {
       setManuals(DEFAULT_MANUALS);
@@ -328,6 +335,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
             onOpenAddModal={() => setAddModalOpen(true)}
             onResetManuals={handleResetManuals}
             onAskAboutManual={handleAskAboutManual}
+            onDeleteManual={handleDeleteManual}
           />
         )}
 
