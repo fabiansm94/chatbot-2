@@ -81,3 +81,17 @@ export interface KnowledgeProposal {
   reviewedAt?: string;
   rejectionReason?: string;
 }
+
+export interface UserChatThread {
+  userId: string;
+  userName: string;
+  userRole: string;
+  department: string;
+  initials: string;
+  bgGradient: string;
+  isCurrentUser: boolean;
+  messages: ChatMessage[];
+  unreadCount?: number;
+  lastActive: string;
+}
+

@@ -31,7 +31,7 @@ export const EmbedIntegrationView: React.FC<EmbedIntegrationViewProps> = ({
   hasGeminiKey
 }) => {
   const [activeSnippetTab, setActiveSnippetTab] = useState<'script' | 'iframe' | 'link'>('script');
-  const [themeColor, setThemeColor] = useState('#4f46e5');
+  const [themeColor, setThemeColor] = useState('#fa5252');
   const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right');
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedIframe, setCopiedIframe] = useState(false);
@@ -75,126 +75,135 @@ export const EmbedIntegrationView: React.FC<EmbedIntegrationViewProps> = ({
   };
 
   const colorPresets = [
-    { label: 'Índigo Corporativo', value: '#4f46e5' },
-    { label: 'Azul Marino / Tech', value: '#2563eb' },
-    { label: 'Esmeralda / SST', value: '#059669' },
-    { label: 'Morado Ejecutivo', value: '#7c3aed' },
-    { label: 'Ámbar Cálido', value: '#d97706' }
+    { label: 'Coral Oficial', value: '#fa5252' },
+    { label: 'Índigo Tech', value: '#4f46e5' },
+    { label: 'Azul Corporativo', value: '#2563eb' },
+    { label: 'Esmeralda', value: '#059669' },
+    { label: 'Morado Ejecutivo', value: '#7c3aed' }
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Hero Affirmation */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/50 to-slate-900 border border-slate-800 p-6 sm:p-8">
-        <div className="max-w-3xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>100% Compatible con Cualquier Web o Intranet</span>
+    <div className="flex-1 w-full h-full min-h-0 overflow-y-auto p-4 sm:p-8 bg-[#fafbfc] space-y-6">
+      {/* Top Banner Card */}
+      <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
+        <div className="max-w-3xl space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#fa5252]">
+              Despliegue & Conexión
+            </span>
+            <span className="text-slate-300">/</span>
+            <span className="text-xs text-slate-500">Integración en Web</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
             ¿Cómo poner este Chatbot en la página de tu trabajo?
           </h1>
 
-          <p className="text-sm text-slate-300 leading-relaxed">
-            <strong>¡Sí, funciona perfectamente!</strong> Puedes integrarlo en la página de tu empresa, intranet de SharePoint, WordPress, Google Sites, Notion o Confluence. Tus trabajadores tendrán acceso inmediato a todos los manuales y procedimientos internos sin salir de su flujo de trabajo.
+          <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+            Puedes integrarlo en la web de tu empresa, SharePoint, WordPress, Google Sites, Notion o Confluence. Tus trabajadores tendrán acceso inmediato a todos los manuales y procedimientos internos.
           </p>
         </div>
       </div>
 
       {/* Main Grid: Code Generator on the left, Live Intranet Simulator on the right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Embed Methods & Code */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-4">
           {/* Method Selector Tabs */}
-          <div className="p-1 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-1">
+          <div className="p-1 rounded-full bg-white border border-slate-200 flex items-center gap-1 shadow-2xs">
             <button
               onClick={() => setActiveSnippetTab('script')}
-              className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-1.5 px-3 rounded-full text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                 activeSnippetTab === 'script'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#fa5252] text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>1. Burbuja Flotante (Recomendado)</span>
+              <span>Burbuja Flotante</span>
             </button>
 
             <button
               onClick={() => setActiveSnippetTab('iframe')}
-              className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-1.5 px-3 rounded-full text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                 activeSnippetTab === 'iframe'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#fa5252] text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>2. iFrame Embebido</span>
+              <span>iFrame Embebido</span>
             </button>
 
             <button
               onClick={() => setActiveSnippetTab('link')}
-              className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-1.5 px-3 rounded-full text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                 activeSnippetTab === 'link'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#fa5252] text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
-              <span>3. Enlace Directo</span>
+              <span>Enlace Directo</span>
             </button>
           </div>
 
-          {/* Configuration Panel */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Palette className="w-4 h-4 text-indigo-400" />
-              <span>Personalizar aspecto del widget</span>
+          {/* Configuration Options */}
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Personalizar Apariencia del Widget:
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1.5 font-medium">Color de Marca / Botón:</label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {colorPresets.map(preset => (
-                    <button
-                      key={preset.value}
-                      onClick={() => setThemeColor(preset.value)}
-                      className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                        themeColor === preset.value ? 'scale-115 border-white shadow-lg' : 'border-transparent hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: preset.value }}
-                      title={preset.label}
-                    />
-                  ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Color Picker */}
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-slate-600">Color Primario:</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {colorPresets.map(preset => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={() => setThemeColor(preset.value)}
+                        className={`w-6 h-6 rounded-full transition-transform ${
+                          themeColor === preset.value ? 'scale-125 ring-2 ring-slate-400' : 'hover:scale-110'
+                        }`}
+                        style={{ backgroundColor: preset.value }}
+                        title={preset.label}
+                      />
+                    ))}
+                  </div>
                   <input
                     type="color"
                     value={themeColor}
                     onChange={e => setThemeColor(e.target.value)}
-                    className="w-6 h-6 rounded-full bg-transparent border-0 cursor-pointer"
+                    className="w-7 h-7 rounded border border-slate-200 cursor-pointer bg-transparent"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1.5 font-medium">Posición en la pantalla:</label>
+              {/* Position */}
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-slate-600">Ubicación en Pantalla:</label>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setWidgetPosition('bottom-right')}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
                       widgetPosition === 'bottom-right'
-                        ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
-                        : 'bg-slate-950 text-slate-400 border-slate-800'
+                        ? 'bg-rose-50 border-[#fa5252] text-[#fa5252] font-semibold'
+                        : 'bg-slate-50 border-slate-200 text-slate-600'
                     }`}
                   >
                     Inferior Derecha
                   </button>
                   <button
+                    type="button"
                     onClick={() => setWidgetPosition('bottom-left')}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
                       widgetPosition === 'bottom-left'
-                        ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
-                        : 'bg-slate-950 text-slate-400 border-slate-800'
+                        ? 'bg-rose-50 border-[#fa5252] text-[#fa5252] font-semibold'
+                        : 'bg-slate-50 border-slate-200 text-slate-600'
                     }`}
                   >
                     Inferior Izquierda
@@ -204,26 +213,29 @@ export const EmbedIntegrationView: React.FC<EmbedIntegrationViewProps> = ({
             </div>
           </div>
 
-          {/* Snippet Code Box */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-semibold text-slate-400 flex items-center gap-1.5">
-                <FileCode className="w-4 h-4 text-indigo-400" />
-                {activeSnippetTab === 'script' && 'Código JavaScript (Pegar en tu web o CMS)'}
-                {activeSnippetTab === 'iframe' && 'Código HTML (iFrame para incrustar)'}
-                {activeSnippetTab === 'link' && 'URL directa del Portal'}
-              </span>
+          {/* Generated Code Snippet */}
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-sm">
+            <div className="px-4 py-3 bg-slate-950 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <FileCode className="w-4 h-4 text-[#fa5252]" />
+                <span className="text-xs font-mono text-slate-300">
+                  {activeSnippetTab === 'script' ? 'código-widget.html' : activeSnippetTab === 'iframe' ? 'embed-iframe.html' : 'url-directa.txt'}
+                </span>
+              </div>
 
               <button
                 onClick={() => handleCopy(activeSnippetTab)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 hover:bg-white text-slate-300 hover:text-slate-900 text-xs font-semibold transition-all"
               >
-                {(activeSnippetTab === 'script' && copiedScript) ||
-                (activeSnippetTab === 'iframe' && copiedIframe) ||
-                (activeSnippetTab === 'link' && copiedLink) ? (
+                {activeSnippetTab === 'script' && copiedScript ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-300" />
-                    <span>¡Copiado al portapapeles!</span>
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>¡Copiado!</span>
+                  </>
+                ) : activeSnippetTab === 'iframe' && copiedIframe ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>¡Copiado!</span>
                   </>
                 ) : (
                   <>
@@ -234,131 +246,52 @@ export const EmbedIntegrationView: React.FC<EmbedIntegrationViewProps> = ({
               </button>
             </div>
 
-            <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-indigo-200 overflow-x-auto font-mono select-all leading-relaxed">
-              {activeSnippetTab === 'script' && scriptCode}
-              {activeSnippetTab === 'iframe' && iframeCode}
-              {activeSnippetTab === 'link' && directLink}
-            </pre>
-
-            {/* Step-by-step instructions */}
-            <div className="pt-3 border-t border-slate-800 space-y-2 text-xs text-slate-300">
-              <div className="font-semibold text-white flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
-                <span>¿Dónde se pega este código en tu empresa?</span>
-              </div>
-              {activeSnippetTab === 'script' && (
-                <ol className="list-decimal list-inside space-y-1 text-slate-400 pl-1">
-                  <li>Copia el código superior con el botón <strong>Copiar Código</strong>.</li>
-                  <li>Ve a tu sitio corporativo (WordPress, SharePoint, panel de intranet o archivo <code className="text-indigo-300">index.html</code>).</li>
-                  <li>Pégalo justo antes de la etiqueta de cierre <code className="text-indigo-300">&lt;/body&gt;</code> o en el bloque de scripts del encabezado.</li>
-                  <li>¡Listo! Aparecerá de inmediato el botón flotante en la esquina para todos los trabajadores.</li>
-                </ol>
-              )}
-              {activeSnippetTab === 'iframe' && (
-                <ol className="list-decimal list-inside space-y-1 text-slate-400 pl-1">
-                  <li>Copia el bloque <code className="text-indigo-300">&lt;iframe&gt;</code>.</li>
-                  <li>En tu gestor de contenido o intranet (ej. SharePoint / WordPress / Google Sites), agrega un bloque de <strong>"Insertar Código HTML"</strong> o <strong>"Embed"</strong>.</li>
-                  <li>Pega el código. La ventana del asistente se mostrará integrada dentro de la propia página.</li>
-                </ol>
-              )}
-              {activeSnippetTab === 'link' && (
-                <p className="text-slate-400">
-                  Comparte esta URL con tus trabajadores, agrégala en los marcadores de Google Chrome / Edge o vincúlala en el menú de navegación de la intranet de la empresa.
-                </p>
-              )}
+            <div className="p-4 font-mono text-xs text-rose-200 overflow-x-auto leading-relaxed bg-slate-900">
+              <pre>
+                {activeSnippetTab === 'script' ? scriptCode : activeSnippetTab === 'iframe' ? iframeCode : directLink}
+              </pre>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Live Simulator of Company Intranet with Floating Widget */}
+        {/* Right Column: Interactive Simulator */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Laptop className="w-4 h-4 text-indigo-400" />
-                <span>Simulador en Vivo: Intranet de la Empresa</span>
-              </h2>
-              <p className="text-xs text-slate-400">
-                Haz clic en la burbuja flotante para probar la experiencia que tendrán tus trabajadores.
-              </p>
-            </div>
-          </div>
-
-          {/* Browser Window Mockup */}
-          <div className="relative rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden min-h-[580px] flex flex-col">
-            {/* Browser top chrome */}
-            <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-              </div>
-              <div className="flex-1 max-w-xs mx-auto px-3 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400 truncate text-center">
-                intranet.{companyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'empresa'}.com/portal
-              </div>
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Simulador en Vivo:
+              </h3>
+              <span className="text-[11px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-150">
+                ● Listo para producción
+              </span>
             </div>
 
-            {/* Mock Intranet Content */}
-            <div className="flex-1 p-5 space-y-4 bg-slate-950/70 select-none overflow-y-auto">
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
-                  Portal del Empleado • {companyName}
-                </span>
-                <h3 className="text-sm font-bold text-white">
-                  Bienvenido al Espacio de Trabajo Digital
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Aquí puedes consultar comunicados internos, nóminas, calendario de festivos y noticias corporativas.
-                </p>
-              </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Haz clic en el botón circular abajo para abrir o cerrar la ventana del bot exactamente como se verá en tu intranet corporativa.
+            </p>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                  <div className="font-semibold text-white">Fichaje Diario</div>
-                  <div className="text-[11px] text-emerald-400 mt-1">● Turno Activo (09:00 - 18:00)</div>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                  <div className="font-semibold text-white">Mis Días Libres</div>
-                  <div className="text-[11px] text-slate-400 mt-1">18 días disponibles</div>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-900/30 text-xs text-indigo-300">
-                💡 <strong>Duda laboral:</strong> En cualquier momento puedes pulsar la burbuja de chat en la esquina para que el Asistente responda cualquier pregunta con base en los manuales oficiales.
-              </div>
-            </div>
-
-            {/* Floating Widget Launcher Button */}
-            <div
-              className={`absolute bottom-4 ${
-                widgetPosition === 'bottom-left' ? 'left-4' : 'right-4'
-              } z-30`}
-            >
+            <div className="p-6 rounded-xl bg-slate-100/80 border border-dashed border-slate-300 flex flex-col items-center justify-center gap-4 text-center">
               <button
                 type="button"
                 onClick={() => setSimWidgetOpen(!simWidgetOpen)}
-                className="w-13 h-13 rounded-full text-white flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                style={{ backgroundColor: themeColor }}
-                title="Abrir Asistente de Manuales Internos"
-                aria-label="Abrir Asistente"
+                className="w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer overflow-hidden p-1 bg-white ring-2 ring-rose-200"
               >
-                {simWidgetOpen ? (
-                  <span className="text-lg font-bold">✕</span>
-                ) : (
-                  <Bot className="w-6 h-6" />
-                )}
+                <img
+                  src="/assets/aistudio/Minimal_White_Mascot_Face_Icon_40e4f488.png"
+                  alt="ManualBot"
+                  className="w-full h-full object-contain"
+                />
               </button>
+              <div className="text-xs text-slate-600 font-medium">
+                {simWidgetOpen ? 'El widget está ABIERTO' : 'Haz clic para probar el botón flotante'}
+              </div>
             </div>
 
-            {/* Floating Widget Popup (Inside the mock simulator) */}
             {simWidgetOpen && (
-              <div
-                className={`absolute bottom-20 ${
-                  widgetPosition === 'bottom-left' ? 'left-3' : 'right-3'
-                } w-[340px] h-[480px] max-w-[calc(100%-24px)] rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl z-40 overflow-hidden flex flex-col animate-fade-in`}
-              >
+              <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xl">
                 <WidgetContainer
                   companyName={companyName}
+                  primaryColor={themeColor}
                   manuals={manuals}
                   hasGeminiKey={hasGeminiKey}
                 />

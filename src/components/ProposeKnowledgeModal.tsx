@@ -86,56 +86,56 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden my-8">
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+            <div className="p-2 rounded-xl bg-[#fa5252]/10 text-[#fa5252]">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Enseñar un Nuevo Procedimiento al Asistente</h2>
-              <p className="text-xs text-slate-400">Propón un nuevo procedimiento o política para que tus compañeros puedan consultarlo</p>
+              <h2 className="text-base font-bold text-slate-800">Enseñar un Nuevo Procedimiento al Asistente</h2>
+              <p className="text-xs text-slate-500">Propón un nuevo procedimiento o política para que tus compañeros puedan consultarlo</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Warning Banner: Requires Admin Approval */}
-        <div className="p-3.5 bg-amber-950/30 border-b border-amber-900/40 text-xs text-amber-300 flex items-start gap-2.5">
-          <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="p-3.5 bg-amber-50 border-b border-amber-200/70 text-xs text-amber-800 flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <span>
             <strong>Control de Calidad y Aprobación:</strong> La información no se guardará en el Asistente automáticamente. Tu propuesta pasará primero al <strong>Buzón de Aprobaciones del Administrador</strong>. Una vez revisada y autorizada por ti o tu supervisor, el bot la incorporará a sus respuestas oficiales.
           </span>
         </div>
 
         {/* Templates quick selector */}
-        <div className="p-3.5 bg-indigo-950/20 border-b border-indigo-900/30 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-indigo-300 font-medium">Ejemplos Rápidos:</span>
+        <div className="p-3.5 bg-orange-50/50 border-b border-orange-100 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-600 font-medium">Ejemplos Rápidos:</span>
           <button
             type="button"
             onClick={() => handleApplyTemplate('vpn')}
-            className="text-xs px-2.5 py-1 rounded-md bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30 border border-indigo-500/30 transition-colors"
+            className="text-xs px-2.5 py-1 rounded-lg bg-white text-[#fa5252] hover:bg-orange-50 border border-orange-200 shadow-2xs transition-colors"
           >
             Acceso a VPN
           </button>
           <button
             type="button"
             onClick={() => handleApplyTemplate('salas')}
-            className="text-xs px-2.5 py-1 rounded-md bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30 border border-indigo-500/30 transition-colors"
+            className="text-xs px-2.5 py-1 rounded-lg bg-white text-[#fa5252] hover:bg-orange-50 border border-orange-200 shadow-2xs transition-colors"
           >
             Reserva de Salas
           </button>
           <button
             type="button"
             onClick={() => handleApplyTemplate('taxi')}
-            className="text-xs px-2.5 py-1 rounded-md bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30 border border-indigo-500/30 transition-colors"
+            className="text-xs px-2.5 py-1 rounded-lg bg-white text-[#fa5252] hover:bg-orange-50 border border-orange-200 shadow-2xs transition-colors"
           >
             Taxis Nocturnos
           </button>
@@ -144,14 +144,14 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
           {error && (
-            <div className="p-3 rounded-lg bg-red-950/50 border border-red-800 text-xs text-red-200">
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
               {error}
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Título del Procedimiento o Regla *
               </label>
               <input
@@ -160,12 +160,12 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
                 placeholder="Ej. Protocolo de Reserva de Salas de Reunión"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#fa5252] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tu Nombre o Departamento *
               </label>
               <input
@@ -174,20 +174,20 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
                 placeholder="Ej. Juan Pérez (Operaciones) / TI"
                 value={submittedBy}
                 onChange={e => setSubmittedBy(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#fa5252] focus:bg-white"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Categoría
               </label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value as ManualCategory)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#fa5252] focus:bg-white"
               >
                 <option value="operaciones">Operaciones & Procesos</option>
                 <option value="rrhh">RRHH & Beneficios</option>
@@ -199,7 +199,7 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Departamento Responsable
               </label>
               <input
@@ -207,18 +207,18 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
                 placeholder="Ej. Soporte al Empleado"
                 value={department}
                 onChange={e => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#fa5252] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Vincular a Manual Existente
               </label>
               <select
                 value={targetManualId}
                 onChange={e => setTargetManualId(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#fa5252] focus:bg-white"
               >
                 <option value="">Crear nuevo documento</option>
                 {manuals.map(m => (
@@ -231,7 +231,7 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
               Contenido Oficial del Procedimiento o Respuesta *
             </label>
             <textarea
@@ -240,13 +240,13 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
               placeholder="Explica detalladamente los pasos, requisitos, plazos y directrices que el Asistente debe responder a los trabajadores..."
               value={content}
               onChange={e => setContent(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 leading-relaxed font-sans"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#fa5252] focus:bg-white leading-relaxed font-sans"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block text-[11px] text-slate-400 mb-0.5 font-medium">
+              <label className="block text-[11px] text-slate-500 mb-0.5 font-medium">
                 Puntos Clave / Resumen (separados por |)
               </label>
               <input
@@ -254,11 +254,11 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
                 placeholder="Paso 1 | Paso 2 | Plazo máx"
                 value={keyPoints}
                 onChange={e => setKeyPoints(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#fa5252] focus:bg-white"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-slate-400 mb-0.5 font-medium">
+              <label className="block text-[11px] text-slate-500 mb-0.5 font-medium">
                 Palabras clave de búsqueda (separadas por comas)
               </label>
               <input
@@ -266,13 +266,13 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
                 placeholder="sala, reserva, meeting"
                 value={tags}
                 onChange={e => setTags(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#fa5252] focus:bg-white"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
               ¿Por qué se propone esta información? (Para el Administrador)
             </label>
             <input
@@ -280,26 +280,26 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
               placeholder="Ej. Cambio de política la semana pasada / Pregunta recurrente en el equipo"
               value={reason}
               onChange={e => setReason(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#fa5252] focus:bg-white"
             />
           </div>
 
           {/* Footer Submit */}
-          <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500">
+          <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">
               Estado inicial: ⏳ Pendiente de Aprobación
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#fa5252] hover:bg-[#e04343] text-white text-xs font-semibold shadow-md shadow-[#fa5252]/20 transition-all"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Enviar para Aprobación</span>

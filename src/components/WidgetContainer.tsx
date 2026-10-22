@@ -94,8 +94,12 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       {/* Widget Header */}
       <div className="p-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0 shadow-sm">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-600/30">
-            <Bot className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-full bg-white ring-2 ring-rose-200/80 shadow-xs flex items-center justify-center overflow-hidden p-0.5">
+            <img
+              src="/assets/aistudio/Minimal_White_Mascot_Face_Icon_40e4f488.png"
+              alt="ManualBot"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <div className="flex items-center gap-1.5">

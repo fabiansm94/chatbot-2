@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
+import { LeftRail } from './components/LeftRail';
 import { ChatView } from './components/ChatView';
 import { ManualsBookView } from './components/ManualsBookView';
 import { ArticleExplorerView } from './components/ArticleExplorerView';
@@ -12,12 +12,14 @@ import { ManualDrawer } from './components/ManualDrawer';
 import { AddManualModal } from './components/AddManualModal';
 import { DEFAULT_MANUALS } from './data/defaultManuals';
 import { DEFAULT_PROPOSALS } from './data/defaultProposals';
-import { ChatMessage, Citation, ManualDocument, ManualSection, KnowledgeProposal } from './types/manual';
+import { DEFAULT_USER_THREADS, appendUserMessage } from './data/userChatThreads';
+import { ChatMessage, Citation, ManualDocument, ManualSection, KnowledgeProposal, UserChatThread } from './types/manual';
 import { approveProposal, rejectProposal } from './utils/approvalWorkflow';
 
 const STORAGE_KEY_MANUALS = 'manualbot_company_manuals_v1';
 const STORAGE_KEY_COMPANY = 'manualbot_company_name_v1';
 const STORAGE_KEY_CHAT = 'manualbot_chat_history_v1';
+const STORAGE_KEY_THREADS = 'manualbot_user_threads_v2';
 const STORAGE_KEY_PROPOSALS = 'manualbot_proposals_v1';
 
 export default function App() {
@@ -55,16 +57,36 @@ export default function App() {
     return localStorage.getItem(STORAGE_KEY_COMPANY) || 'Global Corp & Partners';
   });
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+  const [threads, setThreads] = useState<UserChatThread[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_CHAT);
-      if (saved) return JSON.parse(saved);
+      const savedThreads = localStorage.getItem(STORAGE_KEY_THREADS);
+      if (savedThreads) {
+        const parsed = JSON.parse(savedThreads);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch (e) {
-      console.warn('Failed to parse saved chat');
+      console.warn('Failed to parse saved threads, using defaults');
     }
-    return [];
+
+    // Check if user has previous chat messages in STORAGE_KEY_CHAT
+    try {
+      const savedChat = localStorage.getItem(STORAGE_KEY_CHAT);
+      if (savedChat) {
+        const parsed = JSON.parse(savedChat);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return DEFAULT_USER_THREADS.map(t =>
+            t.isCurrentUser ? { ...t, messages: parsed } : t
+          );
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    return DEFAULT_USER_THREADS;
   });
 
+  const [activeThreadId, setActiveThreadId] = useState<string>('current-user');
   const [isLoading, setIsLoading] = useState(false);
   const [hasGeminiKey, setHasGeminiKey] = useState(false);
 
@@ -110,13 +132,18 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(messages));
+      localStorage.setItem(STORAGE_KEY_THREADS, JSON.stringify(threads));
+      const currentUserThread = threads.find(t => t.isCurrentUser);
+      if (currentUserThread) {
+        localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(currentUserThread.messages));
+      }
     } catch (e) {
-      console.warn('LocalStorage save failed for chat');
+      console.warn('LocalStorage save failed for threads');
     }
-  }, [messages]);
+  }, [threads]);
 
   const handleSendMessage = async (text: string) => {
+    setActiveThreadId('current-user');
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -124,8 +151,10 @@ export default function App() {
       timestamp: Date.now()
     };
 
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    const currentThread = threads.find(t => t.isCurrentUser) || threads[0];
+    const newMessages = [...currentThread.messages, userMsg];
+
+    setThreads(prev => appendUserMessage(prev, 'current-user', userMsg));
     setIsLoading(true);
 
     try {
@@ -154,7 +183,7 @@ export default function App() {
         timestamp: Date.now()
       };
 
-      setMessages(prev => [...prev, assistantMsg]);
+      setThreads(prev => appendUserMessage(prev, 'current-user', assistantMsg));
     } catch (error: any) {
       console.error('Error sending message:', error);
       const errorMsg: ChatMessage = {
@@ -164,14 +193,16 @@ export default function App() {
         timestamp: Date.now(),
         error: true
       };
-      setMessages(prev => [...prev, errorMsg]);
+      setThreads(prev => appendUserMessage(prev, 'current-user', errorMsg));
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleClearChat = () => {
-    setMessages([]);
+    setThreads(prev =>
+      prev.map(t => (t.isCurrentUser ? { ...t, messages: [] } : t))
+    );
     localStorage.removeItem(STORAGE_KEY_CHAT);
   };
 
@@ -193,7 +224,6 @@ export default function App() {
       }
     }
 
-    // Fallback if exact match wasn't found in current state
     if (foundManual && foundManual.sections.length > 0) {
       setDrawerManual(foundManual);
       setDrawerSection(foundManual.sections[0]);
@@ -202,15 +232,15 @@ export default function App() {
   };
 
   const handleAskAboutSection = (section: ManualSection, manual: ManualDocument) => {
-    const query = `¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`;
     setActiveTab('chat');
-    handleSendMessage(query);
+    setActiveThreadId('current-user');
+    handleSendMessage(`¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`);
   };
 
   const handleAskAboutManual = (manual: ManualDocument) => {
-    const query = `¿Cuáles son los temas, derechos y obligaciones principales que contempla el ${manual.title} (${manual.code})?`;
     setActiveTab('chat');
-    handleSendMessage(query);
+    setActiveThreadId('current-user');
+    handleSendMessage(`¿Cuáles son los temas, derechos y obligaciones principales que contempla el ${manual.title} (${manual.code})?`);
   };
 
   const handleAddManual = (newManual: ManualDocument) => {
@@ -277,81 +307,83 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Navigation */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        companyName={companyName}
-        totalManuals={manuals.length}
-        totalArticles={totalArticles}
-        pendingApprovalsCount={pendingApprovalsCount}
-        hasGeminiKey={hasGeminiKey}
-        onOpenProposeModal={() => setProposeModalOpen(true)}
-      />
+    <div className="min-h-screen bg-[#ebeef2] text-slate-800 p-2 sm:p-4 lg:p-6 flex items-center justify-center font-sans antialiased">
+      {/* Floating Card Window matching reference image */}
+      <div className="w-full max-w-7xl h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)] lg:h-[calc(100vh-3rem)] bg-white rounded-[24px] sm:rounded-[32px] shadow-2xl overflow-hidden flex border border-slate-200/80">
+        {/* 1. Left Slim Rail (Coral Gradient) */}
+        <LeftRail
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          pendingApprovalsCount={pendingApprovalsCount}
+          totalManuals={manuals.length}
+        />
 
-      {/* Main View Area */}
-      <main className="flex-1 flex flex-col">
-        {activeTab === 'chat' && (
-          <ChatView
-            messages={messages}
-            isLoading={isLoading}
-            onSendMessage={handleSendMessage}
-            onClearChat={handleClearChat}
-            onOpenCitation={handleOpenCitation}
-            companyName={companyName}
-            hasGeminiKey={hasGeminiKey}
-            manuals={manuals}
-            onOpenProposeModal={() => setProposeModalOpen(true)}
-          />
-        )}
+        {/* 2. Main View Area */}
+        <main className="flex-1 flex overflow-hidden bg-white min-w-0 min-h-0 h-full">
+          {activeTab === 'chat' && (
+            <ChatView
+              threads={threads}
+              activeThreadId={activeThreadId}
+              onSelectThread={setActiveThreadId}
+              isLoading={isLoading}
+              onSendMessage={handleSendMessage}
+              onClearChat={handleClearChat}
+              onOpenCitation={handleOpenCitation}
+              companyName={companyName}
+              hasGeminiKey={hasGeminiKey}
+              manuals={manuals}
+              onOpenProposeModal={() => setProposeModalOpen(true)}
+              onOpenSection={handleOpenSection}
+            />
+          )}
 
-        {activeTab === 'book' && (
-          <ManualsBookView
-            manuals={manuals}
-            onOpenSection={handleOpenSection}
-            onOpenAddModal={() => setAddModalOpen(true)}
-            onResetManuals={handleResetManuals}
-            onAskAboutManual={handleAskAboutManual}
-          />
-        )}
+          {activeTab === 'book' && (
+            <ManualsBookView
+              manuals={manuals}
+              onOpenSection={handleOpenSection}
+              onOpenAddModal={() => setAddModalOpen(true)}
+              onResetManuals={handleResetManuals}
+              onAskAboutManual={handleAskAboutManual}
+            />
+          )}
 
-        {activeTab === 'explorer' && (
-          <ArticleExplorerView
-            manuals={manuals}
-            onOpenSection={handleOpenSection}
-            onAskAboutSection={handleAskAboutSection}
-          />
-        )}
+          {activeTab === 'explorer' && (
+            <ArticleExplorerView
+              manuals={manuals}
+              onOpenSection={handleOpenSection}
+              onAskAboutSection={handleAskAboutSection}
+            />
+          )}
 
-        {activeTab === 'approvals' && (
-          <ApprovalsView
-            proposals={proposals}
-            onApprove={handleApproveProposal}
-            onReject={handleRejectProposal}
-            onOpenProposeModal={() => setProposeModalOpen(true)}
-          />
-        )}
+          {activeTab === 'approvals' && (
+            <ApprovalsView
+              proposals={proposals}
+              onApprove={handleApproveProposal}
+              onReject={handleRejectProposal}
+              onOpenProposeModal={() => setProposeModalOpen(true)}
+            />
+          )}
 
-        {activeTab === 'embed' && (
-          <EmbedIntegrationView
-            companyName={companyName}
-            manuals={manuals}
-            hasGeminiKey={hasGeminiKey}
-          />
-        )}
+          {activeTab === 'embed' && (
+            <EmbedIntegrationView
+              companyName={companyName}
+              manuals={manuals}
+              hasGeminiKey={hasGeminiKey}
+            />
+          )}
 
-        {activeTab === 'settings' && (
-          <SettingsView
-            companyName={companyName}
-            setCompanyName={setCompanyName}
-            manuals={manuals}
-            onImportManuals={handleImportManuals}
-            onResetManuals={handleResetManuals}
-            hasGeminiKey={hasGeminiKey}
-          />
-        )}
-      </main>
+          {activeTab === 'settings' && (
+            <SettingsView
+              companyName={companyName}
+              setCompanyName={setCompanyName}
+              manuals={manuals}
+              onImportManuals={handleImportManuals}
+              onResetManuals={handleResetManuals}
+              hasGeminiKey={hasGeminiKey}
+            />
+          )}
+        </main>
+      </div>
 
       {/* Section Reference Drawer */}
       <ManualDrawer
