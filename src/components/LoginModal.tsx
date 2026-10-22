@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { USERS } from '../data/users';
 
 interface LoginModalProps {
-  onLogin: (station: 'Estación 1' | 'Estación 2') => void;
+  onLogin: (station: 'Estación 1' | 'Estación 2', userName: string) => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onLogin }) => {
@@ -14,7 +14,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin }) => {
     e.preventDefault();
     const user = USERS.find(u => u.password === code);
     if (user && station) {
-      onLogin(station);
+      onLogin(station, user.name);
     } else {
       setError('Código inválido o estación no seleccionada');
     }

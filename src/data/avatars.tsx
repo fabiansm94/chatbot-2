@@ -6,7 +6,9 @@ export interface AvatarProfile {
   department: string;
   role: string;
   color: string;
-  bgGradient: string;
+  bgGradient?: string;
+  bgColor?: string;
+  textColor?: string;
   initials: string;
   avatarUrl?: string;
 }
@@ -16,8 +18,9 @@ export const USER_PROFILE: AvatarProfile = {
   name: 'Tú',
   department: 'Colaborador',
   role: 'Empleado',
-  color: '#fa5252',
-  bgGradient: 'from-amber-400 via-rose-500 to-red-500',
+  color: '#2563eb',
+  bgColor: '#2563eb',
+  textColor: '#ffffff',
   initials: 'TU'
 };
 
@@ -80,6 +83,20 @@ export const DEPARTMENT_PROFILES: Record<string, AvatarProfile> = {
   }
 };
 
+const USER_COLORS: Record<string, { bg: string; text: string }> = {
+  angelo: { bg: '#2563eb', text: '#ffffff' }, // Blue
+  anthony: { bg: '#059669', text: '#ffffff' }, // Emerald
+  emmanuel: { bg: '#7c3aed', text: '#ffffff' }, // Violet
+  fabian: { bg: '#db2777', text: '#ffffff' }, // Pink
+  froylan: { bg: '#ea580c', text: '#ffffff' }, // Orange
+  jeremy: { bg: '#0284c7', text: '#ffffff' }, // Sky
+  'juan carlos': { bg: '#16a34a', text: '#ffffff' }, // Green
+  kendal: { bg: '#9333ea', text: '#ffffff' }, // Purple
+  kevin: { bg: '#dc2626', text: '#ffffff' }, // Red
+  soporte: { bg: '#4f46e5', text: '#ffffff' }, // Indigo
+  sebastian: { bg: '#0d9488', text: '#ffffff' } // Teal
+};
+
 export const RenderAvatar: React.FC<{
   profile: AvatarProfile;
   size?: 'xs' | 'sm' | 'md' | 'lg';
@@ -93,25 +110,39 @@ export const RenderAvatar: React.FC<{
     lg: 'w-12 h-12 text-sm font-bold'
   };
 
+  const isBot = profile.id === 'aizen';
+
   return (
     <div className={`relative shrink-0 ${className}`}>
       {profile.avatarUrl ? (
-        <div
-          className={`${sizeClasses[size]} rounded-full bg-white ring-2 ring-rose-200/80 shadow-2xs flex items-center justify-center overflow-hidden p-0.5`}
-        >
-          <img
-            src={profile.avatarUrl}
-            alt={profile.name}
-            className="w-full h-full object-contain rounded-full"
-          />
-        </div>
+        isBot ? (
+          <div className={`${sizeClasses[size]} flex items-center justify-center overflow-hidden`}>
+            <img
+              src={profile.avatarUrl}
+              alt={profile.name}
+              className="w-full h-full object-contain"
+            />
+          </div>
+        ) : (
+          <div
+            className={`${sizeClasses[size]} rounded-full bg-white ring-2 ring-rose-200/80 shadow-2xs flex items-center justify-center overflow-hidden p-0.5`}
+          >
+            <img
+              src={profile.avatarUrl}
+              alt={profile.name}
+              className="w-full h-full object-contain rounded-full"
+            />
+          </div>
+        )
       ) : (
         <div
-          className={`${sizeClasses[size]} rounded-full bg-gradient-to-tr ${profile.bgGradient} p-0.5 shadow-xs flex items-center justify-center text-white`}
+          className={`${sizeClasses[size]} rounded-full shadow-xs flex items-center justify-center font-bold tracking-tight`}
+          style={{
+            backgroundColor: profile.bgColor || '#334155',
+            color: profile.textColor || '#ffffff'
+          }}
         >
-          <div className="w-full h-full rounded-full bg-slate-900/10 flex items-center justify-center font-bold tracking-tight">
-            {profile.initials}
-          </div>
+          {profile.initials}
         </div>
       )}
       {showStatus && (
@@ -120,3 +151,31 @@ export const RenderAvatar: React.FC<{
     </div>
   );
 };
+
+export function getUserProfile(loggedUserName?: string): AvatarProfile {
+  if (!loggedUserName) return USER_PROFILE;
+  const name = loggedUserName.trim();
+  const lowerName = name.toLowerCase();
+  const parts = name.split(/\s+/);
+  let initials = 'U';
+  if (parts.length >= 2) {
+    initials = (parts[0][0] + parts[1][0]).toUpperCase();
+  } else if (name.length >= 2) {
+    initials = name.slice(0, 2).toUpperCase();
+  } else {
+    initials = name.toUpperCase();
+  }
+
+  const colorConfig = USER_COLORS[lowerName] || { bg: '#334155', text: '#ffffff' };
+
+  return {
+    id: 'current-user',
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    department: 'Colaborador',
+    role: 'Empleado',
+    color: colorConfig.bg,
+    bgColor: colorConfig.bg,
+    textColor: colorConfig.text,
+    initials
+  };
+}

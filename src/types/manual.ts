@@ -26,8 +26,9 @@ export interface ManualDocument {
   version: string;
   updatedDate: string;
   summary: string;
+  description?: string;
   department: string;
-  iconName: 'Users' | 'ShieldAlert' | 'Laptop' | 'Scale' | 'FileText' | 'Briefcase' | 'HelpCircle';
+  iconName: 'Users' | 'ShieldAlert' | 'Laptop' | 'Scale' | 'FileText' | 'Briefcase' | 'HelpCircle' | 'Eye' | 'ShieldCheck' | 'AlertTriangle';
   sections: ManualSection[];
 }
 

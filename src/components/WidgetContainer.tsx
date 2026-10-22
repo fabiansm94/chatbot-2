@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bot } from 'lucide-react';
-import { ManualDocument } from '../types/manual';
+import { ManualDocument, ManualSection, ChatMessage, Citation, UserChatThread } from '../types/manual';
 import { LeftRail } from './LeftRail';
 import { ChatView } from './ChatView';
 import { ManualDrawer } from './ManualDrawer';
-import { DEFAULT_USER_THREADS } from '../data/userChatThreads';
+import { LoginModal } from './LoginModal';
+import { DEFAULT_USER_THREADS, appendUserMessage } from '../data/userChatThreads';
 
 interface WidgetContainerProps {
   companyName: string;
   manuals: ManualDocument[];
   hasGeminiKey: boolean;
+  primaryColor?: string;
 }
 
 export const WidgetContainer: React.FC<WidgetContainerProps> = ({
@@ -17,44 +19,179 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   manuals,
   hasGeminiKey
 }) => {
-  const [threads, setThreads] = useState<any[]>(DEFAULT_USER_THREADS);
+  const [threads, setThreads] = useState<UserChatThread[]>(() => {
+    try {
+      const saved = localStorage.getItem('manualbot_widget_threads_v3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_USER_THREADS;
+  });
   const [activeThreadId, setActiveThreadId] = useState<string>('current-user');
   const [activeTab, setActiveTab] = useState<'chat' | 'book' | 'explorer' | 'settings'>('chat');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendMessage = async (text: string) => { /* logic */ };
-  const handleClearChat = () => { /* logic */ };
-  const handleOpenCitation = (cit: any) => { /* logic */ };
-  const handleOpenSection = (sec: any, man: any) => { /* logic */ };
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(true);
+  const [station, setStation] = useState<'Estación 1' | 'Estación 2' | null>(null);
+  const [loggedUserName, setLoggedUserName] = useState<string>(() => {
+    return localStorage.getItem('manualbot_widget_logged_user_v1') || '';
+  });
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      const h = now.getHours();
+      if ((h === 6 || h === 14 || h === 22) && now.getMinutes() === 0) {
+        setIsAuthenticated(false);
+        setShowLoginModal(true);
+      }
+    };
+    const interval = setInterval(checkTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleLogin = (station: 'Estación 1' | 'Estación 2', userName: string) => {
+    setStation(station);
+    setIsAuthenticated(true);
+    setShowLoginModal(false);
+    setLoggedUserName(userName);
+    localStorage.setItem('manualbot_widget_logged_user_v1', userName);
+  };
+
+  // Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerManual, setDrawerManual] = useState<ManualDocument | null>(null);
+  const [drawerSection, setDrawerSection] = useState<ManualSection | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('manualbot_widget_threads_v3', JSON.stringify(threads));
+    } catch (e) {}
+  }, [threads]);
+
+  const handleSendMessage = async (text: string) => {
+    setActiveThreadId('current-user');
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: Date.now()
+    };
+
+    const currentThread = threads.find(t => t.isCurrentUser) || threads[0];
+    const newMessages = [...currentThread.messages, userMsg];
+
+    setThreads(prev => appendUserMessage(prev, 'current-user', userMsg));
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: newMessages.slice(-6),
+          manuals,
+          companyName
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const assistantMsg: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: data.text || 'No he podido generar una respuesta en este momento.',
+        citations: data.citations || [],
+        grounded: data.grounded,
+        timestamp: Date.now()
+      };
+
+      setThreads(prev => appendUserMessage(prev, 'current-user', assistantMsg));
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      const errorMsg: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: 'Hubo un inconveniente temporal de comunicación. He recurrido a la base interna local de manuales. Por favor intenta reformular tu pregunta.',
+        timestamp: Date.now(),
+        error: true
+      };
+      setThreads(prev => appendUserMessage(prev, 'current-user', errorMsg));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClearChat = () => {
+    setThreads(prev =>
+      prev.map(t => (t.isCurrentUser ? { ...t, messages: [] } : t))
+    );
+  };
+
+  const handleOpenSection = (section: ManualSection, manual: ManualDocument) => {
+    setDrawerManual(manual);
+    setDrawerSection(section);
+    setDrawerOpen(true);
+  };
+
+  const handleOpenCitation = (citation: Citation) => {
+    const foundManual = manuals.find(m => m.id === citation.manualId || m.code === citation.manualCode);
+    if (foundManual) {
+      const foundSection = foundManual.sections.find(s => s.id === citation.sectionId || s.articleNumber === citation.articleNumber);
+      if (foundSection) {
+        setDrawerManual(foundManual);
+        setDrawerSection(foundSection);
+        setDrawerOpen(true);
+        return;
+      }
+    }
+    if (foundManual && foundManual.sections.length > 0) {
+      setDrawerManual(foundManual);
+      setDrawerSection(foundManual.sections[0]);
+      setDrawerOpen(true);
+    }
+  };
 
   return (
     <div className="w-full h-screen max-h-screen bg-[#1a1a1a] text-slate-200 flex overflow-hidden font-sans">
-      <LeftRail
-        activeTab={activeTab as any}
-        setActiveTab={setActiveTab as any}
-        pendingApprovalsCount={0}
-        totalManuals={manuals.length}
-      />
+      {showLoginModal && <LoginModal onLogin={handleLogin} />}
       
-      <main className="flex-1 flex overflow-hidden bg-[#242424]">
-        {activeTab === 'chat' && (
-          <ChatView
-            threads={threads}
-            activeThreadId={activeThreadId}
-            onSelectThread={setActiveThreadId}
-            isLoading={isLoading}
-            onSendMessage={handleSendMessage}
-            onClearChat={handleClearChat}
-            onOpenCitation={handleOpenCitation}
-            companyName={companyName}
-            hasGeminiKey={hasGeminiKey}
-            manuals={manuals}
-            onOpenProposeModal={() => {}}
-            onOpenSection={handleOpenSection}
-          />
-        )}
-        {/* Other tabs can be added similarly */}
+      <main className="flex-1 flex overflow-hidden bg-[#242424] w-full h-full">
+        <ChatView
+          threads={threads}
+          activeThreadId={activeThreadId}
+          onSelectThread={setActiveThreadId}
+          isLoading={isLoading}
+          onSendMessage={handleSendMessage}
+          onClearChat={handleClearChat}
+          onOpenCitation={handleOpenCitation}
+          companyName={companyName}
+          hasGeminiKey={hasGeminiKey}
+          manuals={manuals}
+          onOpenProposeModal={() => {}}
+          onOpenSection={handleOpenSection}
+          loggedUserName={loggedUserName}
+        />
       </main>
+
+      <ManualDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        manual={drawerManual}
+        section={drawerSection}
+        onAskAboutSection={(section, manual) => {
+          setDrawerOpen(false);
+          setActiveTab('chat');
+          handleSendMessage(`¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`);
+        }}
+      />
     </div>
   );
 };

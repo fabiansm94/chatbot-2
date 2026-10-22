@@ -22,7 +22,7 @@ import {
   MoreVertical
 } from 'lucide-react';
 import { ChatMessage, Citation, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
-import { BOT_PROFILE, USER_PROFILE, RenderAvatar, AvatarProfile } from '../data/avatars';
+import { BOT_PROFILE, USER_PROFILE, getUserProfile, RenderAvatar, AvatarProfile } from '../data/avatars';
 
 interface ChatViewProps {
   threads: UserChatThread[];
@@ -37,6 +37,7 @@ interface ChatViewProps {
   manuals: ManualDocument[];
   onOpenProposeModal?: () => void;
   onOpenSection?: (section: ManualSection, manual: ManualDocument) => void;
+  loggedUserName?: string;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -48,7 +49,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onClearChat,
   onOpenCitation,
   companyName,
-  onOpenProposeModal
+  onOpenProposeModal,
+  loggedUserName
 }) => {
   const [inputText, setInputText] = useState('');
   const [sidebarSearch, setSidebarSearch] = useState('');
@@ -106,7 +108,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   // Helper to build avatar profile for display
   const getThreadAvatarProfile = (thread: UserChatThread): AvatarProfile => {
-    if (thread.isCurrentUser) return USER_PROFILE;
+    if (thread.isCurrentUser) return getUserProfile(loggedUserName);
     return {
       id: thread.userId,
       name: thread.userName,
@@ -173,7 +175,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 : 'hover:bg-[#1a1a1a]'
             }`}
           >
-            <RenderAvatar profile={USER_PROFILE} size="md" showStatus />
+            <RenderAvatar profile={getUserProfile(loggedUserName)} size="md" showStatus />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-0.5">
                 <div className="flex items-center gap-1.5">
@@ -273,6 +275,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 relative">
+            {loggedUserName && (
+              <span className="text-xs bg-white/10 px-2.5 py-1 rounded-full font-bold text-white shadow-xs capitalize">
+                Usuario: {loggedUserName}
+              </span>
+            )}
+
             {!isViewingSelf && (
               <button
                 type="button"
@@ -363,42 +371,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
           {activeThread.messages.length === 0 ? (
             /* Empty State */
             <div className="max-w-lg mx-auto py-10 text-center space-y-6 select-none">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#e03131] to-[#fa5252] p-1 mx-auto shadow-lg shadow-rose-900/20">
-                <div className="w-full h-full bg-[#1a1a1a] rounded-full flex items-center justify-center overflow-hidden p-1">
-                  <img
-                    src="/assets/aistudio/Minimal_White_Mascot_Face_Icon_40e4f488.png"
-                    alt="ManualBot"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
+              <div className="w-20 h-20 mx-auto flex items-center justify-center overflow-hidden">
+                <img
+                  src="/assets/aistudio/Minimal_White_Mascot_Face_Icon_40e4f488.png"
+                  alt="Aizen"
+                  className="w-full h-full object-contain"
+                />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-3">
+                <div className="text-xs uppercase tracking-widest text-[#fa5252] font-bold">
+                  Bienvenidos... a la sociedad STS Security
+                </div>
                 <h3 className="text-xl font-bold text-slate-200">
-                  ¡Hola! Soy tu compañero para dudas de la empresa
+                  ¡Hola! Soy tu compañero para dudas con los procedimientos.
                 </h3>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                  Este es tu chat único con ManualBot. Pregúntame con confianza sobre tus dudas internas.
+                  Este es tu chat único con Aizen. Pregunta con confianza sobre tus dudas internas. Ningún protocolo escapa a nuestro control; permíteme guiarte paso a paso.
                 </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left pt-2">
-                {[
-                  '¿Cómo reporto un incidente?',
-                  '¿Procedimiento de acceso?'
-                ].map((q, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      if (!isViewingSelf) onSelectThread('current-user');
-                      onSendMessage(q);
-                    }}
-                    className="p-3 rounded-2xl bg-[#242424] border border-[#333333] hover:border-[#fa5252] hover:bg-rose-900/20 text-xs text-slate-300 transition-all shadow-2xs font-medium"
-                  >
-                    {q}
-                  </button>
-                ))}
               </div>
             </div>
           ) : (

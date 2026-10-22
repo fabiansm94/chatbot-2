@@ -20,7 +20,7 @@ import { approveProposal, rejectProposal } from './utils/approvalWorkflow';
 const STORAGE_KEY_MANUALS = 'manualbot_company_manuals_v1';
 const STORAGE_KEY_COMPANY = 'manualbot_company_name_v1';
 const STORAGE_KEY_CHAT = 'manualbot_chat_history_v1';
-const STORAGE_KEY_THREADS = 'manualbot_user_threads_v2';
+const STORAGE_KEY_THREADS = 'manualbot_user_threads_v3';
 const STORAGE_KEY_PROPOSALS = 'manualbot_proposals_v1';
 
 export default function App() {
@@ -146,6 +146,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [station, setStation] = useState<'Estación 1' | 'Estación 2' | null>(null);
+  const [loggedUserName, setLoggedUserName] = useState<string>(() => {
+    return localStorage.getItem('manualbot_logged_user_name_v1') || '';
+  });
 
   useEffect(() => {
     const checkTime = () => {
@@ -165,10 +168,22 @@ export default function App() {
     if (!isAuthenticated) setShowLoginModal(true);
   }, []);
 
-  const handleLogin = (station: 'Estación 1' | 'Estación 2') => {
+  useEffect(() => {
+    const isFabian = loggedUserName.trim().toLowerCase() === 'fabian';
+    if (!isFabian) {
+      setActiveTab('chat');
+    }
+  }, [loggedUserName]);
+
+  const handleLogin = (station: 'Estación 1' | 'Estación 2', userName: string) => {
     setStation(station);
     setIsAuthenticated(true);
     setShowLoginModal(false);
+    setLoggedUserName(userName);
+    localStorage.setItem('manualbot_logged_user_name_v1', userName);
+    if (userName.trim().toLowerCase() !== 'fabian') {
+      setActiveTab('chat');
+    }
   };
 
   const handleSendMessage = async (text: string) => {
@@ -347,6 +362,7 @@ export default function App() {
           setActiveTab={setActiveTab}
           pendingApprovalsCount={pendingApprovalsCount}
           totalManuals={manuals.length}
+          loggedUserName={loggedUserName}
         />
 
         {/* 2. Main View Area */}
@@ -365,6 +381,7 @@ export default function App() {
               manuals={manuals}
               onOpenProposeModal={() => setProposeModalOpen(true)}
               onOpenSection={handleOpenSection}
+              loggedUserName={loggedUserName}
             />
           )}
 
