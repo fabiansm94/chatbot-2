@@ -22,13 +22,13 @@ export const USER_PROFILE: AvatarProfile = {
 };
 
 export const BOT_PROFILE: AvatarProfile = {
-  id: 'manualbot',
-  name: 'ManualBot',
+  id: 'aizen',
+  name: 'Aizen',
   department: 'Asistente IA',
   role: 'Compañero Oficial',
   color: '#ff6b6b',
   bgGradient: 'from-[#ff7a6e] to-[#fa5252]',
-  initials: 'MB',
+  initials: 'AZ',
   avatarUrl: '/assets/aistudio/Minimal_White_Mascot_Face_Icon_40e4f488.png'
 };
 

@@ -103,7 +103,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-xs sm:text-sm text-white">ManualBot</span>
+              <span className="font-bold text-xs sm:text-sm text-white">Aizen</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </div>
             <span className="text-[11px] text-slate-400 block truncate max-w-[190px]">

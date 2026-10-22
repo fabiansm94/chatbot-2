@@ -81,41 +81,6 @@ export const LeftRail: React.FC<LeftRailProps> = ({
           >
             <Search className="w-5 h-5 stroke-[2.2]" />
           </button>
-
-          {/* Approvals Tab with Star Icon */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('approvals')}
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all relative ${
-              activeTab === 'approvals'
-                ? 'bg-white text-[#fa5252] shadow-md shadow-black/10 scale-105'
-                : 'text-white/80 hover:text-white hover:bg-white/15'
-            }`}
-            title="Buzón de Aprobaciones"
-            aria-label="Aprobaciones"
-          >
-            <Star className="w-5 h-5 stroke-[2.2]" />
-            {pendingApprovalsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white text-[#fa5252] text-[10px] font-black flex items-center justify-center shadow-xs">
-                {pendingApprovalsCount}
-              </span>
-            )}
-          </button>
-
-          {/* Embed / Web Share Tab */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('embed')}
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
-              activeTab === 'embed'
-                ? 'bg-white text-[#fa5252] shadow-md shadow-black/10 scale-105'
-                : 'text-white/80 hover:text-white hover:bg-white/15'
-            }`}
-            title="Integrar en Web de la Empresa"
-            aria-label="Integrar en Web"
-          >
-            <Globe className="w-5 h-5 stroke-[2.2]" />
-          </button>
         </nav>
       </div>
 

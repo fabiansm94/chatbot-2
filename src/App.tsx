@@ -10,6 +10,7 @@ import { ApprovalsView } from './components/ApprovalsView';
 import { ProposeKnowledgeModal } from './components/ProposeKnowledgeModal';
 import { ManualDrawer } from './components/ManualDrawer';
 import { AddManualModal } from './components/AddManualModal';
+import { LoginModal } from './components/LoginModal';
 import { DEFAULT_MANUALS } from './data/defaultManuals';
 import { DEFAULT_PROPOSALS } from './data/defaultProposals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from './data/userChatThreads';
@@ -142,6 +143,34 @@ export default function App() {
     }
   }, [threads]);
 
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [station, setStation] = useState<'Estación 1' | 'Estación 2' | null>(null);
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      const h = now.getHours();
+      if ((h === 6 || h === 14 || h === 22) && now.getMinutes() === 0) {
+        setIsAuthenticated(false);
+        setShowLoginModal(true);
+      }
+    };
+    const interval = setInterval(checkTime, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Show on mount if not authenticated
+    if (!isAuthenticated) setShowLoginModal(true);
+  }, []);
+
+  const handleLogin = (station: 'Estación 1' | 'Estación 2') => {
+    setStation(station);
+    setIsAuthenticated(true);
+    setShowLoginModal(false);
+  };
+
   const handleSendMessage = async (text: string) => {
     setActiveThreadId('current-user');
     const userMsg: ChatMessage = {
@@ -199,6 +228,7 @@ export default function App() {
     }
   };
 
+
   const handleClearChat = () => {
     setThreads(prev =>
       prev.map(t => (t.isCurrentUser ? { ...t, messages: [] } : t))
@@ -248,7 +278,7 @@ export default function App() {
   };
 
   const handleResetManuals = () => {
-    if (window.confirm('¿Deseas restablecer el Book a los manuales corporativos estándar?')) {
+    if (window.confirm('¿Deseas restablecer el Book a los Procedimientos de Control y Monitoreo estándar?')) {
       setManuals(DEFAULT_MANUALS);
       localStorage.removeItem(STORAGE_KEY_MANUALS);
     }
@@ -307,9 +337,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#ebeef2] text-slate-800 p-2 sm:p-4 lg:p-6 flex items-center justify-center font-sans antialiased">
+    <div className="min-h-screen bg-[#1a1a1a] text-slate-200 p-2 sm:p-4 lg:p-6 flex items-center justify-center font-sans antialiased">
+      {showLoginModal && <LoginModal onLogin={handleLogin} />}
       {/* Floating Card Window matching reference image */}
-      <div className="w-full max-w-7xl h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)] lg:h-[calc(100vh-3rem)] bg-white rounded-[24px] sm:rounded-[32px] shadow-2xl overflow-hidden flex border border-slate-200/80">
+      <div className="w-full max-w-7xl h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)] lg:h-[calc(100vh-3rem)] bg-[#242424] rounded-[24px] sm:rounded-[32px] shadow-2xl overflow-hidden flex border border-[#333333]">
         {/* 1. Left Slim Rail (Coral Gradient) */}
         <LeftRail
           activeTab={activeTab}
@@ -319,7 +350,7 @@ export default function App() {
         />
 
         {/* 2. Main View Area */}
-        <main className="flex-1 flex overflow-hidden bg-white min-w-0 min-h-0 h-full">
+        <main className="flex-1 flex overflow-hidden bg-[#242424] min-w-0 min-h-0 h-full">
           {activeTab === 'chat' && (
             <ChatView
               threads={threads}
@@ -356,20 +387,11 @@ export default function App() {
           )}
 
           {activeTab === 'approvals' && (
-            <ApprovalsView
-              proposals={proposals}
-              onApprove={handleApproveProposal}
-              onReject={handleRejectProposal}
-              onOpenProposeModal={() => setProposeModalOpen(true)}
-            />
+            <div className="p-8 text-center text-slate-500">Esta sección ha sido movida a Configuración.</div>
           )}
 
           {activeTab === 'embed' && (
-            <EmbedIntegrationView
-              companyName={companyName}
-              manuals={manuals}
-              hasGeminiKey={hasGeminiKey}
-            />
+            <div className="p-8 text-center text-slate-500">Esta sección ha sido movida a Configuración.</div>
           )}
 
           {activeTab === 'settings' && (
@@ -380,6 +402,10 @@ export default function App() {
               onImportManuals={handleImportManuals}
               onResetManuals={handleResetManuals}
               hasGeminiKey={hasGeminiKey}
+              proposals={proposals}
+              onApproveProposal={handleApproveProposal}
+              onRejectProposal={handleRejectProposal}
+              onOpenProposeModal={() => setProposeModalOpen(true)}
             />
           )}
         </main>
