@@ -72,8 +72,8 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const [activeTab, setActiveTab] = useState<'chat' | 'book' | 'explorer' | 'settings'>('chat');
   const [isLoading, setIsLoading] = useState(false);
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => localStorage.getItem('manualbot_widget_auth_v1') === 'true');
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(!isAuthenticated);
   const [station, setStation] = useState<'Estación 1' | 'Estación 2' | null>(null);
   const [loggedUserName, setLoggedUserName] = useState<string>(() => {
     return localStorage.getItem('manualbot_widget_logged_user_v1') || '';
@@ -88,6 +88,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       if ((h === 6 || h === 14 || h === 22) && now.getMinutes() === 0) {
         setIsAuthenticated(false);
         setShowLoginModal(true);
+        localStorage.setItem('manualbot_widget_auth_v1', 'false');
       }
     };
     const interval = setInterval(checkTime, 60000);
@@ -100,6 +101,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     setShowLoginModal(false);
     setLoggedUserName(userName);
     localStorage.setItem('manualbot_widget_logged_user_v1', userName);
+    localStorage.setItem('manualbot_widget_auth_v1', 'true');
     const isFab = userName.trim().toLowerCase() === 'fabian';
     if (!isFab) {
       setActiveTab('chat');
@@ -111,6 +113,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     setShowLoginModal(true);
     setLoggedUserName('');
     localStorage.removeItem('manualbot_widget_logged_user_v1');
+    localStorage.setItem('manualbot_widget_auth_v1', 'false');
   };
 
   // Drawer & Modal state

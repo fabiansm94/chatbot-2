@@ -143,7 +143,7 @@ export default function App() {
     }
   }, [threads]);
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => localStorage.getItem('manualbot_auth_v1') === 'true');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [station, setStation] = useState<'Estación 1' | 'Estación 2' | null>(null);
   const [loggedUserName, setLoggedUserName] = useState<string>(() => {
@@ -159,6 +159,7 @@ export default function App() {
       if ((h === 6 || h === 14 || h === 22) && now.getMinutes() === 0) {
         setIsAuthenticated(false);
         setShowLoginModal(true);
+        localStorage.setItem('manualbot_auth_v1', 'false');
       }
     };
     const interval = setInterval(checkTime, 60000); // Check every minute
@@ -183,6 +184,7 @@ export default function App() {
     setShowLoginModal(false);
     setLoggedUserName(userName);
     localStorage.setItem('manualbot_logged_user_name_v1', userName);
+    localStorage.setItem('manualbot_auth_v1', 'true');
     if (userName.trim().toLowerCase() !== 'fabian') {
       setActiveTab('chat');
     }
@@ -193,6 +195,7 @@ export default function App() {
     setShowLoginModal(true);
     setLoggedUserName('');
     localStorage.removeItem('manualbot_logged_user_name_v1');
+    localStorage.setItem('manualbot_auth_v1', 'false');
   };
 
   const handleSendMessage = async (text: string) => {
