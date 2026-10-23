@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "Manual": {
+      "title": "Manual Document",
+      "description": "Official company manuals and policies",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "code": { "type": "string" },
+        "category": { "type": "string" },
+        "department": { "type": "string" },
+        "version": { "type": "string" },
+        "updatedDate": { "type": "string" },
+        "summary": { "type": "string" },
+        "iconName": { "type": "string" }
+      },
+      "required": ["id", "title", "code"]
+    },
+    "Proposal": {
+      "title": "Knowledge Proposal",
+      "description": "Proposals submitted by users for new procedures",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "submittedBy": { "type": "string" },
+        "department": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "submittedBy", "status"]
+    },
+    "ChatThread": {
+      "title": "User Chat Thread",
+      "description": "Chat messages and conversation threads for users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "department": { "type": "string" },
+        "userRole": { "type": "string" },
+        "isCurrentUser": { "type": "boolean" }
+      },
+      "required": ["userId", "userName"]
+    }
+  },
+  "firestore": {
+    "/manuals/{manualId}": {
+      "schema": "Manual",
+      "description": "Company manuals collection"
+    },
+    "/proposals/{proposalId}": {
+      "schema": "Proposal",
+      "description": "Knowledge proposals collection"
+    },
+    "/chats/{userId}": {
+      "schema": "ChatThread",
+      "description": "User chat threads collection"
+    }
+  }
+}

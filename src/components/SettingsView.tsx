@@ -88,9 +88,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'embed' | 'approvals' | 'users'>('general');
 
   return (
-    <div className="flex-1 w-full h-full min-h-0 flex flex-col bg-[#1a1a1a] text-slate-200">
+    <div className="flex-1 w-full h-full min-h-0 flex flex-col bg-[#2f3140] text-white">
       {/* Sub-menu */}
-      <div className="px-4 sm:px-6 pt-6 pb-2 border-b border-[#333333] bg-[#242424]">
+      <div className="px-4 sm:px-6 pt-6 pb-2 border-b border-[#3e4153] bg-[#262835]">
         <div className="flex gap-2">
           {[
             { id: 'general', label: 'Configuración General' },
@@ -103,8 +103,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onClick={() => setActiveSubTab(tab.id as any)}
               className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-all ${
                 activeSubTab === tab.id
-                  ? 'bg-[#1a1a1a] text-[#fa5252] border-b-2 border-[#fa5252]'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-[#2f3140] text-[#ca4048] border-b-2 border-[#ca4048]'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               {tab.label}
@@ -120,20 +120,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <h1 className="text-2xl font-bold text-white tracking-tight">
                 Configuración del Asistente y Book Corporativo
               </h1>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-slate-300 mt-1">
                 Ajusta la identidad empresarial, revisa el estado del motor Gemini y gestiona respaldos del repositorio.
               </p>
             </div>
 
             {/* Company Name Customization */}
-            <div className="p-6 rounded-2xl bg-[#242424] border border-[#333333] shadow-xs space-y-4">
+            <div className="p-6 rounded-2xl bg-[#262835] border border-[#3e4153] shadow-md space-y-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#fa5252]/10 text-[#fa5252] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#ca4048]/20 text-[#ca4048] flex items-center justify-center">
                   <Building2 className="w-4 h-4" />
                 </div>
                 <h2 className="text-base font-bold text-white">Nombre de la Organización</h2>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-300">
                 El Asistente utilizará este nombre para identificarse y contextualizar las normativas corporativas.
               </p>
 
@@ -143,11 +143,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   value={nameInput}
                   onChange={e => setNameInput(e.target.value)}
                   placeholder="Ej. Mi Empresa S.A."
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#333333] text-sm text-white placeholder-slate-600 focus:outline-none focus:border-[#fa5252] transition-colors"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#2f3140] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048] transition-colors"
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2.5 rounded-xl bg-[#fa5252] hover:bg-[#e04343] text-white text-xs font-semibold transition-all flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] text-white text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
                 >
                   {savedSuccess ? (
                     <>
@@ -162,59 +162,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             {/* Gemini AI Engine Card */}
-            <div className="p-6 rounded-2xl bg-[#242424] border border-[#333333] shadow-xs space-y-4">
+            <div className="p-6 rounded-2xl bg-[#262835] border border-[#3e4153] shadow-md space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#fa5252]/10 text-[#fa5252] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-[#ca4048]/20 text-[#ca4048] flex items-center justify-center">
                     <Cpu className="w-4 h-4" />
                   </div>
                   <h2 className="text-base font-bold text-white">Motor de Inteligencia Artificial</h2>
                 </div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
                   hasGeminiKey
-                    ? 'bg-emerald-900/20 text-emerald-400 border border-emerald-900/50'
-                    : 'bg-amber-900/20 text-amber-400 border border-amber-900/50'
+                    ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-amber-950/40 text-amber-300 border border-amber-500/40'
                 }`}>
-                  <span className={`w-2 h-2 rounded-full ${hasGeminiKey ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                  <span className={`w-2 h-2 rounded-full ${hasGeminiKey ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
                   <span>{hasGeminiKey ? 'Conectado a Gemini 3.8 Flash' : 'Motor RAG Interno Activo'}</span>
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3.5 rounded-xl bg-[#1a1a1a] border border-[#333333] space-y-1">
-                  <div className="text-slate-400 font-medium">Modelo Principal</div>
-                  <div className="text-sm font-bold text-[#fa5252]">gemini-3.8-flash</div>
-                  <div className="text-[11px] text-slate-500">Respuestas rápidas, amigables y fundamentadas</div>
+                <div className="p-3.5 rounded-xl bg-[#2f3140] border border-[#3e4153] space-y-1">
+                  <div className="text-slate-300 font-medium">Modelo Principal</div>
+                  <div className="text-sm font-bold text-[#ca4048]">gemini-3.8-flash</div>
+                  <div className="text-[11px] text-slate-400">Respuestas rápidas, amigables y fundamentadas</div>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#1a1a1a] border border-[#333333] space-y-1">
-                  <div className="text-slate-400 font-medium">Arquitectura de Servidor</div>
-                  <div className="text-sm font-bold text-slate-200">Express + Vite + @google/genai</div>
-                  <div className="text-[11px] text-slate-500">Llamadas seguras en servidor (/api/chat)</div>
+                <div className="p-3.5 rounded-xl bg-[#2f3140] border border-[#3e4153] space-y-1">
+                  <div className="text-slate-300 font-medium">Arquitectura de Servidor</div>
+                  <div className="text-sm font-bold text-white">Express + Vite + @google/genai</div>
+                  <div className="text-[11px] text-slate-400">Llamadas seguras en servidor (/api/chat)</div>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-orange-900/10 border border-orange-900/30 text-xs text-orange-200 flex items-start gap-2">
-                <Info className="w-4 h-4 text-[#fa5252] shrink-0 mt-0.5" />
+              <div className="p-3 rounded-xl bg-[#2f3140] border border-[#3e4153] text-xs text-slate-200 flex items-start gap-2">
+                <Info className="w-4 h-4 text-[#ca4048] shrink-0 mt-0.5" />
                 <span>
-                  Las llamadas a Gemini se procesan en el backend con telemetría <code className="bg-orange-900/30 px-1 py-0.5 rounded text-[11px] font-mono">User-Agent: aistudio-build</code>. Tu API Key se inyecta de forma segura mediante variables de entorno del servidor.
+                  Las llamadas a Gemini se procesan en el backend con telemetría <code className="bg-[#262835] px-1 py-0.5 rounded text-[11px] font-mono border border-[#3e4153]">User-Agent: aistudio-build</code>. Tu API Key se inyecta de forma segura mediante variables de entorno del servidor.
                 </span>
               </div>
             </div>
 
             {/* Export & Import Backup */}
-            <div className="p-6 rounded-2xl bg-[#242424] border border-[#333333] shadow-xs space-y-4">
+            <div className="p-6 rounded-2xl bg-[#262835] border border-[#3e4153] shadow-md space-y-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#fa5252]/10 text-[#fa5252] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#ca4048]/20 text-[#ca4048] flex items-center justify-center">
                   <Download className="w-4 h-4" />
                 </div>
                 <h2 className="text-base font-bold text-white">Respaldo y Portabilidad del Book</h2>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-300">
                 Descarga todos los manuales y cláusulas en formato JSON estructurado o importa un book existente de otra sede.
               </p>
 
               {importError && (
-                <div className="p-3 rounded-lg bg-rose-900/20 border border-rose-900/50 text-xs text-rose-200">
+                <div className="p-3 rounded-lg bg-[#ca4048]/20 border border-[#ca4048]/50 text-xs text-white">
                   {importError}
                 </div>
               )}
@@ -222,14 +222,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={handleExportJSON}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1a1a1a] hover:bg-[#333333] text-slate-200 text-xs font-semibold transition-all border border-[#333333]"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2f3140] hover:bg-[#3e4153] text-white text-xs font-semibold transition-all border border-[#3e4153]"
                 >
-                  <Download className="w-4 h-4 text-slate-400" />
+                  <Download className="w-4 h-4 text-slate-300" />
                   <span>Exportar Book a JSON ({manuals.length} manuales)</span>
                 </button>
 
-                <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1a1a1a] hover:bg-[#333333] text-slate-200 text-xs font-semibold cursor-pointer transition-all border border-[#333333]">
-                  <Upload className="w-4 h-4 text-slate-400" />
+                <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2f3140] hover:bg-[#3e4153] text-white text-xs font-semibold cursor-pointer transition-all border border-[#3e4153]">
+                  <Upload className="w-4 h-4 text-slate-300" />
                   <span>Importar Archivo JSON</span>
                   <input
                     type="file"
@@ -241,7 +241,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
                 <button
                   onClick={onResetManuals}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1a1a1a] hover:bg-rose-900/20 text-slate-400 hover:text-rose-400 text-xs font-semibold border border-[#333333] hover:border-rose-900/50 transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2f3140] hover:bg-[#ca4048]/20 text-slate-300 hover:text-[#ca4048] text-xs font-semibold border border-[#3e4153] hover:border-[#ca4048]/50 transition-all"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Restablecer a Valores de Fábrica</span>
@@ -275,9 +275,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 const UserCard = () => {
                   const [showPass, setShowPass] = useState(false);
                   return (
-                    <div className="p-4 rounded-2xl bg-[#242424] border border-[#333333] shadow-xs flex items-center justify-between">
+                    <div className="p-4 rounded-2xl bg-[#262835] border border-[#3e4153] shadow-md flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#fa5252]/10 text-[#fa5252] flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-[#ca4048]/20 text-[#ca4048] flex items-center justify-center">
                           <User className="w-4 h-4" />
                         </div>
                         <div>
@@ -287,7 +287,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           </div>
                         </div>
                       </div>
-                      <button onClick={() => setShowPass(!showPass)} className="text-slate-500 hover:text-[#fa5252]">
+                      <button onClick={() => setShowPass(!showPass)} className="text-slate-400 hover:text-[#ca4048] transition-colors">
                         {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>

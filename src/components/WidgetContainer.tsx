@@ -295,7 +295,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const pendingApprovalsCount = proposals.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="w-full h-screen max-h-screen bg-[#1a1a1a] text-slate-200 flex overflow-hidden font-sans">
+    <div className="w-full h-screen max-h-screen bg-background text-foreground flex overflow-hidden font-sans">
       {showLoginModal && <LoginModal onLogin={handleLogin} />}
 
       {isFabian && (
@@ -308,7 +308,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
         />
       )}
       
-      <main className="flex-1 flex overflow-hidden bg-[#242424] w-full h-full">
+      <main className="flex-1 flex overflow-hidden bg-background w-full h-full">
         {activeTab === 'chat' && (
           <ChatView
             threads={threads}
@@ -389,8 +389,8 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       />
 
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-slate-900 border border-emerald-500/50 shadow-2xl text-xs text-emerald-200 flex items-center gap-2 animate-fade-in">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-card text-foreground border border-border shadow-medium text-xs flex items-center gap-2 animate-fade-in font-medium">
+          <span className="w-2 h-2 rounded-full bg-success" />
           <span>{toastMessage}</span>
         </div>
       )}

@@ -28,18 +28,18 @@ test('approveProposal incorporates proposal into an existing manual', () => {
     tags: ['taxi', 'nocturno', 'transporte'],
     submittedBy: 'Andrés Vera',
     reason: 'Seguridad en horario nocturno',
-    targetManualId: 'man-rrhh-01',
+    targetManualId: 'man-seg-01',
     articleNumber: 'Art. 5.3'
   });
 
-  const { updatedManuals, approvedProposal } = approveProposal(proposal, DEFAULT_MANUALS, 'Jefe de RRHH');
+  const { updatedManuals, approvedProposal } = approveProposal(proposal, DEFAULT_MANUALS, 'Supervisor de Seguridad');
 
   assert.equal(approvedProposal.status, 'approved');
-  assert.equal(approvedProposal.reviewedBy, 'Jefe de RRHH');
+  assert.equal(approvedProposal.reviewedBy, 'Supervisor de Seguridad');
 
-  const rrhhManual = updatedManuals.find(m => m.id === 'man-rrhh-01');
-  assert.ok(rrhhManual);
-  const newSection = rrhhManual.sections.find(s => s.title === 'Pauta de Reembolso de Taxis Nocturnos');
+  const segManual = updatedManuals.find(m => m.id === 'man-seg-01');
+  assert.ok(segManual);
+  const newSection = segManual.sections.find(s => s.title === 'Pauta de Reembolso de Taxis Nocturnos');
   assert.ok(newSection);
   assert.equal(newSection.articleNumber, 'Art. 5.3');
   assert.equal(newSection.author, 'Andrés Vera');

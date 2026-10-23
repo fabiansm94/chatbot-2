@@ -126,18 +126,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const activeSenderProfile = getThreadAvatarProfile(activeThread);
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden bg-[#242424]">
+    <div className="flex-1 flex h-full overflow-hidden bg-[#2f3140]">
       {/* =========================================================================
           MIDDLE COLUMN: Users & Coworker Chat List (1 Chat Per User)
           ========================================================================= */}
-      <div className="w-72 sm:w-80 border-r border-[#333333] flex flex-col shrink-0 bg-[#242424] select-none">
+      <div className="w-72 sm:w-80 border-r border-[#3e4153] flex flex-col shrink-0 bg-[#262835] select-none">
         {/* Top Search & Propose Bar */}
-        <div className="p-3.5 border-b border-[#333333] flex items-center gap-2.5">
+        <div className="p-3.5 border-b border-[#3e4153] flex items-center gap-2.5">
           {onOpenProposeModal && (
             <button
               type="button"
               onClick={onOpenProposeModal}
-              className="w-8 h-8 rounded-full bg-rose-900/30 text-[#fa5252] border border-rose-900/50 hover:bg-[#fa5252] hover:text-white flex items-center justify-center transition-all shrink-0 shadow-2xs font-semibold text-lg hidden"
+              className="w-8 h-8 rounded-full bg-[#ca4048]/20 text-[#ca4048] border border-[#ca4048]/40 hover:bg-[#ca4048] hover:text-white flex items-center justify-center transition-all shrink-0 shadow-2xs font-semibold text-lg hidden"
               title="Enseñar nuevo procedimiento al bot (+)"
               aria-label="Enseñar al Bot"
             >
@@ -147,19 +147,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
           {/* Pill Search Input */}
           <div className="flex-1 relative flex items-center">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
             <input
               type="text"
               placeholder="Buscar colaborador o duda..."
               value={sidebarSearch}
               onChange={e => setSidebarSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-full bg-[#1a1a1a] border border-[#333333] text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#fa5252] transition-colors"
+              className="w-full pl-8 pr-3 py-1.5 rounded-full bg-[#2f3140] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048] transition-colors"
             />
             {sidebarSearch && (
               <button
                 type="button"
                 onClick={() => setSidebarSearch('')}
-                className="absolute right-2.5 text-[10px] text-slate-500 hover:text-slate-300"
+                className="absolute right-2.5 text-[10px] text-slate-400 hover:text-white"
               >
                 ✕
               </button>
@@ -168,31 +168,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         {/* List of User Chats */}
-        <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-[#333333] scrollbar-none">
+        <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-[#3e4153] scrollbar-none">
           {/* Main User Chat Item (Pinned at Top: "Mi Chat") */}
           <div
             onClick={() => onSelectThread('current-user')}
             className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors ${
               activeThreadId === 'current-user'
-                ? 'bg-[#fa5252]/10 border-l-3 border-[#fa5252]'
-                : 'hover:bg-[#1a1a1a]'
+                ? 'bg-[#ca4048]/15 border-l-3 border-[#ca4048]'
+                : 'hover:bg-[#2f3140]'
             }`}
           >
             <RenderAvatar profile={getUserProfile(loggedUserName)} size="md" showStatus />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-0.5">
                 <div className="flex items-center gap-1.5">
-                  <h4 className="text-xs font-bold text-slate-200 truncate">
+                  <h4 className="text-xs font-bold text-white truncate">
                     Mi Chat con Aizen
                   </h4>
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium">
+                <span className="text-[10px] text-slate-400 font-medium">
                   {currentUserThread.messages.length > 0
                     ? new Date(currentUserThread.messages[currentUserThread.messages.length - 1].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     : 'Activo'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-slate-300 truncate">
                 {currentUserThread.messages.length > 0
                   ? currentUserThread.messages[currentUserThread.messages.length - 1].content.slice(0, 42) + '...'
                   : 'Escribe tu consulta sobre manuales o políticas...'}
@@ -201,9 +201,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </div>
 
           {/* Section Divider: Other Coworkers' Chats */}
-          <div className="px-3.5 py-2 bg-[#1a1a1a] border-y border-[#333333] flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-              <Users className="w-3 h-3 text-[#fa5252]" />
+          <div className="px-3.5 py-2 bg-[#2f3140] border-y border-[#3e4153] flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
+              <Users className="w-3 h-3 text-[#ca4048]" />
               <span>Dudas de Otros Colaboradores</span>
             </span>
           </div>
@@ -220,32 +220,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 key={thread.userId}
                 onClick={() => onSelectThread(thread.userId)}
                 className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors group ${
-                  isSelected ? 'bg-[#fa5252]/10 border-l-3 border-[#fa5252]' : 'hover:bg-[#1a1a1a]'
+                  isSelected ? 'bg-[#ca4048]/15 border-l-3 border-[#ca4048]' : 'hover:bg-[#2f3140]'
                 }`}
               >
                 <RenderAvatar profile={profile} size="md" />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <h4 className="text-xs font-semibold text-slate-200 truncate group-hover:text-[#fa5252] transition-colors">
+                    <h4 className="text-xs font-semibold text-white truncate group-hover:text-[#ca4048] transition-colors">
                       {thread.userName}
                     </h4>
-                    <span className="text-[10px] text-slate-500 font-medium">
+                    <span className="text-[10px] text-slate-400 font-medium">
                       {thread.lastActive}
                     </span>
                   </div>
 
-                  <div className="text-[10px] text-slate-500 truncate mb-0.5">
+                  <div className="text-[10px] text-slate-400 truncate mb-0.5">
                     {thread.department}
                   </div>
 
                   <div className="flex items-center justify-between gap-1">
-                    <p className="text-[11px] text-slate-400 truncate">
+                    <p className="text-[11px] text-slate-300 truncate">
                       {lastMsg ? lastMsg.content : 'Consultas al bot...'}
                     </p>
 
                     <span
-                      className="shrink-0 px-1.5 py-0.2 rounded-full bg-[#fa5252] text-white text-[10px] font-bold"
+                      className="shrink-0 px-1.5 py-0.2 rounded-full bg-[#ca4048] text-white text-[10px] font-bold"
                     >
                       {userQuestionsCount}
                     </span>
@@ -258,11 +258,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </div>
 
       {/* =========================================================================
-          RIGHT COLUMN: Main Chat Area (Coral Top Banner + Light Canvas)
+          RIGHT COLUMN: Main Chat Area
           ========================================================================= */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#1a1a1a]">
-        {/* Top Coral Header Bar */}
-        <div className="bg-gradient-to-r from-[#e03131] to-[#fa5252] px-6 py-3.5 flex items-center justify-between text-white shadow-sm shrink-0 relative select-none">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#2f3140]">
+        {/* Top Header Bar */}
+        <div className="bg-[#ca4048] px-6 py-3.5 flex items-center justify-between text-white shadow-sm shrink-0 relative select-none">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -306,8 +306,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
             {/* Dropdown Options */}
             {headerMenuOpen && (
-              <div className="absolute top-full right-0 mt-2 z-50 w-72 bg-[#242424] rounded-2xl shadow-xl border border-[#333333] py-1.5 text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-3.5 py-2 border-b border-[#333333] font-bold text-slate-200 flex items-center justify-between">
+              <div className="absolute top-full right-0 mt-2 z-50 w-72 bg-[#2f3140] rounded-2xl shadow-xl border border-[#3e4153] py-1.5 text-xs text-white animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3.5 py-2 border-b border-[#3e4153] font-bold text-white flex items-center justify-between">
                   <span>Opciones del Asistente</span>
                 </div>
                 {onOpenProposeModal && (
@@ -316,21 +316,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       setHeaderMenuOpen(false);
                       onOpenProposeModal();
                     }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-[#1a1a1a] flex items-center gap-2 text-xs"
+                    className="w-full px-3.5 py-2 text-left hover:bg-[#262835] flex items-center gap-2 text-xs text-white"
                   >
-                    <Plus className="w-3.5 h-3.5 text-[#fa5252]" />
+                    <Plus className="w-3.5 h-3.5 text-[#ca4048]" />
                     <span>Proponer Nuevo Procedimiento</span>
                   </button>
                 )}
                 <button
                   onClick={() => {
                     setHeaderMenuOpen(false);
-                    // Placeholder for functionality
                     console.log('Mostrar mensajes destacados');
                   }}
-                  className="w-full px-3.5 py-2 text-left hover:bg-[#1a1a1a] flex items-center gap-2 text-xs"
+                  className="w-full px-3.5 py-2 text-left hover:bg-[#262835] flex items-center gap-2 text-xs text-white"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-[#fa5252]" />
+                  <Sparkles className="w-3.5 h-3.5 text-[#ca4048]" />
                   <span>Mostrar mensajes destacados</span>
                 </button>
                 {isViewingSelf && activeThread.messages.length > 0 && (
@@ -339,7 +338,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       setHeaderMenuOpen(false);
                       onClearChat();
                     }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-rose-900/30 text-rose-400 flex items-center gap-2 border-t border-[#333333] text-xs"
+                    className="w-full px-3.5 py-2 text-left hover:bg-[#ca4048]/20 text-[#ca4048] flex items-center gap-2 border-t border-[#3e4153] text-xs"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Limpiar Mi Chat</span>
@@ -351,9 +350,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       setHeaderMenuOpen(false);
                       onLogout();
                     }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-rose-900/30 text-rose-400 flex items-center gap-2 border-t border-[#333333] text-xs font-semibold"
+                    className="w-full px-3.5 py-2 text-left hover:bg-[#ca4048]/20 text-[#ca4048] flex items-center gap-2 border-t border-[#3e4153] text-xs font-semibold"
                   >
-                    <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                    <LogOut className="w-3.5 h-3.5 text-[#ca4048]" />
                     <span>Cerrar Sesión</span>
                   </button>
                 )}
@@ -364,16 +363,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         {/* Informative Banner */}
         {!isViewingSelf && (
-          <div className="bg-[#4d3800] border-b border-[#664d00] px-6 py-2.5 flex items-center justify-between gap-3 text-xs text-amber-200 shrink-0">
+          <div className="bg-[#262835] border-b border-[#3e4153] px-6 py-2.5 flex items-center justify-between gap-3 text-xs text-white shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <Eye className="w-4 h-4 text-amber-400 shrink-0" />
+              <Eye className="w-4 h-4 text-[#ca4048] shrink-0" />
               <span className="truncate">
                 Viendo consultas de <strong>{activeThread.userName}</strong>.
               </span>
             </div>
             <button
               onClick={() => onSelectThread('current-user')}
-              className="text-xs font-bold text-[#fa5252] hover:underline flex items-center gap-1 shrink-0"
+              className="text-xs font-bold text-[#ca4048] hover:underline flex items-center gap-1 shrink-0"
             >
               <span>Preguntar en Mi Chat</span>
               <ArrowRight className="w-3 h-3" />
@@ -382,7 +381,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         )}
 
         {/* Message Scroll Canvas */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 bg-[#2f3140]">
           {activeThread.messages.length === 0 ? (
             /* Empty State */
             <div className="max-w-lg mx-auto py-10 text-center space-y-6 select-none">
@@ -395,14 +394,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
               </div>
 
               <div className="space-y-3">
-                <div className="text-xs uppercase tracking-widest text-[#fa5252] font-bold">
-                  Bienvenidos... a la sociedad STS Security
-                </div>
-                <h3 className="text-xl font-bold text-slate-200">
-                  ¡Hola! Soy tu compañero para dudas con los procedimientos.
+                <h3 className="text-xl font-bold text-white">
+                  ¡Hola! ¿Cómo estás? Aquí estoy listo para darte una mano con cualquier duda
                 </h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                  Este es tu chat único con Aizen. Pregunta con confianza sobre tus dudas internas. Ningún protocolo escapa a nuestro control; permíteme guiarte paso a paso.
+                <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                  ¿En qué te puedo ayudar hoy?
                 </p>
               </div>
             </div>
@@ -425,7 +421,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
               return (
                 <div key={msg.id} className="space-y-1">
-                  <div className={`flex items-center text-xs font-semibold text-slate-400 px-12 ${isUser ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex items-center text-xs font-semibold text-slate-300 px-12 ${isUser ? 'justify-end' : 'justify-start'}`}>
                     <span>{senderName}</span>
                   </div>
 
@@ -435,16 +431,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     )}
 
                     {isUser && (
-                      <span className="text-[11px] text-slate-500 font-medium select-none mb-2">
+                      <span className="text-[11px] text-slate-400 font-medium select-none mb-2">
                         {formattedTime}
                       </span>
                     )}
 
                     <div
-                      className={`relative max-w-lg sm:max-w-xl px-4.5 py-3 text-xs sm:text-sm leading-relaxed transition-all shadow-2xs ${
+                      className={`relative max-w-lg sm:max-w-xl px-4.5 py-3 text-xs sm:text-sm leading-relaxed transition-all shadow-md ${
                         isUser
-                          ? 'bg-[#fa5252] text-white rounded-2xl rounded-tr-xs'
-                          : 'bg-[#333333] text-slate-200 rounded-2xl rounded-tl-xs'
+                          ? 'bg-[#ca4048] text-white rounded-2xl rounded-tr-xs'
+                          : 'bg-[#262835] border border-[#3e4153] text-white rounded-2xl rounded-tl-xs'
                       }`}
                     >
                       <div className="whitespace-pre-line select-text">
@@ -452,9 +448,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       </div>
 
                       {!isUser && msg.citations && msg.citations.length > 0 && (
-                        <div className="mt-2.5 pt-2 border-t border-[#444444] space-y-1">
-                          <div className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                            <BookOpen className="w-3 h-3 text-[#fa5252]" />
+                        <div className="mt-2.5 pt-2 border-t border-[#3e4153] space-y-1">
+                          <div className="text-[10px] font-bold text-white uppercase flex items-center gap-1">
+                            <BookOpen className="w-3 h-3 text-[#ca4048]" />
                             <span>Referencias Oficiales:</span>
                           </div>
                           <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -462,10 +458,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
                               <button
                                 key={idx}
                                 onClick={() => onOpenCitation(cit)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#242424] border border-[#444444] hover:border-[#fa5252] text-[11px] text-[#fa5252] font-medium transition-colors group shadow-2xs"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#2f3140] border border-[#3e4153] hover:border-[#ca4048] text-[11px] text-[#ca4048] font-medium transition-colors group shadow-2xs"
                               >
-                                <span className="font-semibold">{cit.articleNumber}</span>
-                                <span className="text-slate-400 truncate max-w-[120px]">{cit.sectionTitle}</span>
+                                <span className="font-semibold text-white">{cit.articleNumber}</span>
+                                <span className="text-slate-300 truncate max-w-[120px]">{cit.sectionTitle}</span>
                               </button>
                             ))}
                           </div>
@@ -473,7 +469,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       )}
 
                       {!isUser && (
-                        <div className="mt-2 pt-1 flex items-center justify-between text-[10px] text-slate-500 border-t border-[#444444] select-none">
+                        <div className="mt-2 pt-1 flex items-center justify-between text-[10px] text-slate-400 border-t border-[#3e4153] select-none">
                           <div className="flex items-center gap-1">
                             {msg.citations && msg.citations.length > 0 ? (
                               <span className="flex items-center gap-1 text-emerald-400 font-semibold">
@@ -481,14 +477,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                 <span>Book Oficial</span>
                               </span>
                             ) : (
-                              <span>Compañero</span>
+                              <span className="text-slate-300">Compañero</span>
                             )}
                           </div>
 
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => handleCopyMessage(msg.id, msg.content)}
-                              className="p-1 rounded hover:bg-[#444444] transition-colors"
+                              className="p-1 rounded hover:bg-[#3e4153] text-slate-300 hover:text-white transition-colors"
                             >
                               {copiedId === msg.id ? (
                                 <Check className="w-3 h-3 text-emerald-400" />
@@ -498,7 +494,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                             </button>
                             <button
                               onClick={() => handleFeedback(msg.id, 'up')}
-                              className={`p-1 rounded hover:bg-[#444444] transition-colors ${
+                              className={`p-1 rounded hover:bg-[#3e4153] text-slate-300 hover:text-white transition-colors ${
                                 feedbackState[msg.id] === 'up' ? 'text-emerald-400 font-bold' : ''
                               }`}
                             >
@@ -506,8 +502,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
                             </button>
                             <button
                               onClick={() => handleFeedback(msg.id, 'down')}
-                              className={`p-1 rounded hover:bg-[#444444] transition-colors ${
-                                feedbackState[msg.id] === 'down' ? 'text-rose-400 font-bold' : ''
+                              className={`p-1 rounded hover:bg-[#3e4153] text-slate-300 hover:text-white transition-colors ${
+                                feedbackState[msg.id] === 'down' ? 'text-[#ca4048] font-bold' : ''
                               }`}
                             >
                               <ThumbsDown className="w-3 h-3" />
@@ -518,7 +514,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     </div>
 
                     {!isUser && (
-                      <span className="text-[11px] text-slate-500 font-medium select-none mb-2">
+                      <span className="text-[11px] text-slate-400 font-medium select-none mb-2">
                         {formattedTime}
                       </span>
                     )}
@@ -535,8 +531,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           {isLoading && isViewingSelf && (
             <div className="flex items-end gap-2.5 justify-start">
               <RenderAvatar profile={BOT_PROFILE} size="md" className="shrink-0 mb-1" />
-              <div className="px-4 py-3 rounded-2xl rounded-tl-xs bg-[#333333] flex items-center gap-2 text-xs text-slate-400 shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-[#fa5252] animate-ping" />
+              <div className="px-4 py-3 rounded-2xl rounded-tl-xs bg-[#262835] border border-[#3e4153] flex items-center gap-2 text-xs text-white shadow-md">
+                <span className="w-2 h-2 rounded-full bg-[#ca4048] animate-ping" />
                 <span>Escribiendo...</span>
               </div>
             </div>
@@ -546,21 +542,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         {/* Input Bar */}
-        <div className="p-3 sm:p-4 bg-[#242424] border-t border-[#333333] shrink-0">
+        <div className="p-3 sm:p-4 bg-[#262835] border-t border-[#3e4153] shrink-0">
           <form onSubmit={handleSubmit} className="flex items-center gap-2.5">
-            <div className="flex-1 flex items-center bg-[#1a1a1a] border border-[#333333] rounded-full px-4 py-2 focus-within:border-[#fa5252] focus-within:ring-2 focus-within:ring-rose-900/50 transition-all shadow-2xs">
+            <div className="flex-1 flex items-center bg-[#2f3140] border border-[#3e4153] rounded-full px-4 py-2 focus-within:border-[#ca4048] focus-within:ring-2 focus-within:ring-[#ca4048]/30 transition-all shadow-xs">
               <input
                 type="text"
                 placeholder="Escribe un mensaje..."
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
                 disabled={isLoading}
-                className="flex-1 bg-transparent text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
+                className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => setInputText(prev => prev + ' 😊 ')}
-                className="text-slate-500 hover:text-slate-300 transition-colors ml-2"
+                className="text-slate-400 hover:text-white transition-colors ml-2"
               >
                 <Smile className="w-5 h-5 stroke-[1.8]" />
               </button>
@@ -569,7 +565,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               type="submit"
               disabled={!inputText.trim() || isLoading}
-              className="w-10 h-10 rounded-full bg-[#fa5252] hover:bg-[#e03131] disabled:opacity-40 text-white flex items-center justify-center transition-all shadow-md active:scale-95 shrink-0"
+              className="w-10 h-10 rounded-full bg-[#ca4048] hover:bg-[#b5343c] disabled:opacity-40 text-white flex items-center justify-center transition-all shadow-md active:scale-95 shrink-0"
               aria-label="Enviar"
             >
               <Send className="w-4 h-4 ml-0.5" />
