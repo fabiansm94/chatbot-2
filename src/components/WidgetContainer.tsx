@@ -36,10 +36,13 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       const saved = localStorage.getItem(STORAGE_KEY_MANUALS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {}
-    return initialManuals.length > 0 ? initialManuals : DEFAULT_MANUALS;
+    const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
+    const filteredInitial = (initialManuals.length > 0 ? initialManuals : DEFAULT_MANUALS)
+      .filter(m => !deletedIds.includes(m.id));
+    return filteredInitial;
   });
 
   const [proposals, setProposals] = useState<KnowledgeProposal[]>(() => {
@@ -257,8 +260,15 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   };
 
   const handleDeleteManual = (manualId: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento?')) {
+    if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento permanentemente?')) {
       setManuals(prev => prev.filter(m => m.id !== manualId));
+      try {
+        const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
+        if (!deletedIds.includes(manualId)) {
+          deletedIds.push(manualId);
+          localStorage.setItem('manualbot_deleted_manual_ids_v1', JSON.stringify(deletedIds));
+        }
+      } catch (e) {}
       showToast('Manual eliminado correctamente.');
     }
   };

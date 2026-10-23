@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { LeftRail } from './components/LeftRail';
 import { ChatView } from './components/ChatView';
@@ -55,23 +55,47 @@ export default function App() {
 
   // Load from Firebase Firestore on mount
   useEffect(() => {
-    // 1. Load Manuals
-    getDocs(collection(db, 'manuals'))
-      .then(snapshot => {
+    // 1. Load Manuals (Check if seeded or deleted)
+    Promise.all([
+      getDocs(collection(db, 'manuals')),
+      getDoc(doc(db, 'system_meta', 'manuals_meta'))
+    ])
+      .then(([snapshot, metaSnap]) => {
+        const metaData = metaSnap.exists() ? metaSnap.data() : null;
+        const deletedManualIds: string[] = metaData?.deletedManualIds || [];
+        const isSeeded = metaData?.isSeeded || false;
+
         if (!snapshot.empty) {
           const loadedManuals: ManualDocument[] = [];
           snapshot.forEach(docSnap => {
-            loadedManuals.push(docSnap.data() as ManualDocument);
+            const data = docSnap.data() as ManualDocument;
+            if (!deletedManualIds.includes(data.id)) {
+              loadedManuals.push(data);
+            }
           });
           setManuals(loadedManuals);
-        } else {
-          // Seed defaults
+        } else if (!isSeeded) {
+          // First time seeding defaults only if never initialized
+          setDoc(doc(db, 'system_meta', 'manuals_meta'), {
+            isSeeded: true,
+            deletedManualIds: []
+          }).catch(console.warn);
+
           DEFAULT_MANUALS.forEach(m => {
             setDoc(doc(db, 'manuals', m.id), m).catch(console.warn);
           });
+          setManuals(DEFAULT_MANUALS);
+        } else {
+          // If already seeded and collection is empty, user deleted all manuals
+          setManuals([]);
         }
       })
-      .catch(err => console.warn('Error loading manuals from Firestore:', err));
+      .catch(err => {
+        console.warn('Error loading manuals from Firestore:', err);
+        // Fallback to local storage if offline
+        const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
+        setManuals(prev => prev.filter(m => !deletedIds.includes(m.id)));
+      });
 
     // 2. Load Proposals
     getDocs(collection(db, 'proposals'))
@@ -286,17 +310,54 @@ export default function App() {
     showToast('Manual guardado en Firebase.');
   };
 
-  const handleDeleteManual = (manualId: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento?')) {
+  const handleDeleteManual = async (manualId: string) => {
+    if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento permanentemente?')) {
+      // 1. Remove from state immediately
       setManuals(prev => prev.filter(m => m.id !== manualId));
-      deleteDoc(doc(db, 'manuals', manualId)).catch(console.warn);
-      showToast('Manual eliminado correctamente.');
+
+      // 2. Track deleted ID in localStorage
+      try {
+        const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
+        if (!deletedIds.includes(manualId)) {
+          deletedIds.push(manualId);
+          localStorage.setItem('manualbot_deleted_manual_ids_v1', JSON.stringify(deletedIds));
+        }
+      } catch (e) {}
+
+      // 3. Delete document from Firestore
+      try {
+        await deleteDoc(doc(db, 'manuals', manualId));
+      } catch (err) {
+        console.warn('Error deleting doc from Firestore:', err);
+      }
+
+      // 4. Update system_meta to permanently record the deletion so seeding never re-adds it
+      try {
+        await setDoc(doc(db, 'system_meta', 'manuals_meta'), {
+          isSeeded: true,
+          deletedManualIds: arrayUnion(manualId)
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Error updating manuals_meta in Firestore:', err);
+      }
+
+      showToast('Manual eliminado permanentemente.');
     }
   };
 
-  const handleResetManuals = () => {
+  const handleResetManuals = async () => {
     if (window.confirm('¿Deseas restablecer el Book a los Procedimientos estándar?')) {
       setManuals(DEFAULT_MANUALS);
+      localStorage.removeItem('manualbot_deleted_manual_ids_v1');
+
+      // Clear deletedManualIds in Firestore
+      try {
+        await setDoc(doc(db, 'system_meta', 'manuals_meta'), {
+          isSeeded: true,
+          deletedManualIds: []
+        });
+      } catch (e) {}
+
       DEFAULT_MANUALS.forEach(m => {
         setDoc(doc(db, 'manuals', m.id), m).catch(console.warn);
       });
