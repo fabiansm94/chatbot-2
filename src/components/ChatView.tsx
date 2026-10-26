@@ -199,61 +199,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
               </p>
             </div>
           </div>
-
-          {/* Section Divider: Other Coworkers' Chats */}
-          <div className="px-3.5 py-2 bg-[#2f3140] border-y border-[#3e4153] flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
-              <Users className="w-3 h-3 text-[#ca4048]" />
-              <span>Dudas de Otros Colaboradores</span>
-            </span>
-          </div>
-
-          {/* Coworker User Threads */}
-          {coworkerThreads.map(thread => {
-            const isSelected = activeThreadId === thread.userId;
-            const lastMsg = thread.messages[thread.messages.length - 1];
-            const profile = getThreadAvatarProfile(thread);
-            const userQuestionsCount = thread.messages.filter(m => m.role === 'user').length;
-
-            return (
-              <div
-                key={thread.userId}
-                onClick={() => onSelectThread(thread.userId)}
-                className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors group ${
-                  isSelected ? 'bg-[#ca4048]/15 border-l-3 border-[#ca4048]' : 'hover:bg-[#2f3140]'
-                }`}
-              >
-                <RenderAvatar profile={profile} size="md" />
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <h4 className="text-xs font-semibold text-white truncate group-hover:text-[#ca4048] transition-colors">
-                      {thread.userName}
-                    </h4>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      {thread.lastActive}
-                    </span>
-                  </div>
-
-                  <div className="text-[10px] text-slate-400 truncate mb-0.5">
-                    {thread.department}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="text-[11px] text-slate-300 truncate">
-                      {lastMsg ? lastMsg.content : 'Consultas al bot...'}
-                    </p>
-
-                    <span
-                      className="shrink-0 px-1.5 py-0.2 rounded-full bg-[#ca4048] text-white text-[10px] font-bold"
-                    >
-                      {userQuestionsCount}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
 
@@ -310,37 +255,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <div className="px-3.5 py-2 border-b border-[#3e4153] font-bold text-white flex items-center justify-between">
                   <span>Opciones del Asistente</span>
                 </div>
-                {onOpenProposeModal && (
-                  <button
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onOpenProposeModal();
-                    }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-[#262835] flex items-center gap-2 text-xs text-white"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-[#ca4048]" />
-                    <span>Proponer Nuevo Procedimiento</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    console.log('Mostrar mensajes destacados');
-                  }}
-                  className="w-full px-3.5 py-2 text-left hover:bg-[#262835] flex items-center gap-2 text-xs text-white"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-[#ca4048]" />
-                  <span>Mostrar mensajes destacados</span>
-                </button>
                 {isViewingSelf && activeThread.messages.length > 0 && (
                   <button
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onClearChat();
                     }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-[#ca4048]/20 text-[#ca4048] flex items-center gap-2 border-t border-[#3e4153] text-xs"
+                    className="w-full px-3.5 py-2 text-left hover:bg-[#ca4048]/20 text-white flex items-center gap-2 text-xs"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3.5 h-3.5 text-[#ca4048]" />
                     <span>Limpiar Mi Chat</span>
                   </button>
                 )}

@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import {
-  BookOpen,
-  Search,
   Plus,
   Users,
   Laptop,
@@ -15,7 +13,6 @@ import {
   ExternalLink,
   RotateCcw,
   Sparkles,
-  Tag,
   Trash2
 } from 'lucide-react';
 import { ManualCategory, ManualDocument, ManualSection } from '../types/manual';
@@ -37,8 +34,6 @@ export const ManualsBookView: React.FC<ManualsBookViewProps> = ({
   onAskAboutManual,
   onDeleteManual
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [expandedManuals, setExpandedManuals] = useState<Record<string, boolean>>({
     'man-rrhh-01': true // Expand first one by default
   });
@@ -66,23 +61,6 @@ export const ManualsBookView: React.FC<ManualsBookViewProps> = ({
         return <HelpCircle className="w-4 h-4 text-slate-500" />;
     }
   };
-
-  const filteredManuals = manuals.filter(m => {
-    const matchesCategory = selectedCategory === 'all' || m.category === selectedCategory;
-    const matchesSearch =
-      !searchQuery.trim() ||
-      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.sections.some(s =>
-        s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.articleNumber.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    return matchesCategory && matchesSearch;
-  });
-
-  const totalArticles = manuals.reduce((acc, m) => acc + m.sections.length, 0);
 
   return (
     <div className="flex-1 w-full h-full min-h-0 overflow-y-auto p-4 sm:p-8 bg-[#2f3140] text-white space-y-6">
@@ -123,70 +101,11 @@ export const ManualsBookView: React.FC<ManualsBookViewProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Stats Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-[#3e4153]">
-          <div className="p-3 rounded-xl bg-[#2f3140] border border-[#3e4153]">
-            <div className="text-[11px] text-slate-300 font-medium">Manuales Vigentes</div>
-            <div className="text-lg font-bold text-white mt-0.5">{manuals.length}</div>
-          </div>
-          <div className="p-3 rounded-xl bg-[#2f3140] border border-[#3e4153]">
-            <div className="text-[11px] text-slate-300 font-medium">Artículos Indexados</div>
-            <div className="text-lg font-bold text-[#ca4048] mt-0.5">{totalArticles}</div>
-          </div>
-          <div className="p-3 rounded-xl bg-[#2f3140] border border-[#3e4153]">
-            <div className="text-[11px] text-slate-300 font-medium">Motor de Búsqueda</div>
-            <div className="text-lg font-bold text-emerald-400 mt-0.5">RAG Activo</div>
-          </div>
-          <div className="p-3 rounded-xl bg-[#2f3140] border border-[#3e4153]">
-            <div className="text-[11px] text-slate-300 font-medium">Versión Normativa</div>
-            <div className="text-lg font-bold text-white mt-0.5">2026/2027</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Category Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {[
-            { id: 'all', label: 'Todos' },
-            { id: 'rrhh', label: 'RRHH' },
-            { id: 'ti', label: 'TI & Ciberseguridad' },
-            { id: 'seguridad', label: 'Prevención SST' },
-            { id: 'legal_etica', label: 'Ética' },
-            { id: 'operaciones', label: 'Viáticos' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedCategory(tab.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                selectedCategory === tab.id
-                  ? 'bg-[#ca4048] text-white shadow-xs'
-                  : 'bg-[#262835] text-slate-300 hover:bg-[#3e4153] border border-[#3e4153]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="relative min-w-[240px]">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Filtrar por título, artículo..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 rounded-full bg-[#262835] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048] transition-colors"
-          />
-        </div>
       </div>
 
       {/* Manuals List */}
       <div className="space-y-4">
-        {filteredManuals.map(manual => {
+        {manuals.map(manual => {
           const isExpanded = expandedManuals[manual.id] ?? false;
 
           return (
