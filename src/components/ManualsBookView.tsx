@@ -18,6 +18,7 @@ import {
   FileUp
 } from 'lucide-react';
 import { ManualCategory, ManualDocument, ManualSection } from '../types/manual';
+import { stripHtmlForPreview } from '../utils/textFormatting';
 
 interface ManualsBookViewProps {
   manuals: ManualDocument[];
@@ -293,7 +294,7 @@ export const ManualsBookView: React.FC<ManualsBookViewProps> = ({
                             {section.title}
                           </h4>
                           <p className="text-[11px] text-slate-300 mt-1 line-clamp-2 leading-relaxed">
-                            {section.content}
+                            {stripHtmlForPreview(section.content, 140)}
                           </p>
                         </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, FileText, ExternalLink, MessageSquare, Tag, BookOpen, Filter } from 'lucide-react';
 import { ManualDocument, ManualSection } from '../types/manual';
 import { searchManuals } from '../utils/manualSearch';
+import { stripHtmlForPreview } from '../utils/textFormatting';
 
 interface ArticleExplorerViewProps {
   manuals: ManualDocument[];
@@ -145,7 +146,7 @@ export const ArticleExplorerView: React.FC<ArticleExplorerViewProps> = ({
                 </div>
 
                 <p className="text-xs text-slate-300 line-clamp-3 mt-2.5 leading-relaxed">
-                  {section.content}
+                  {stripHtmlForPreview(section.content, 180)}
                 </p>
               </div>
 

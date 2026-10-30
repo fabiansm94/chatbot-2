@@ -13,6 +13,7 @@ import {
 } from './utils/manualSearch.ts';
 import { DEFAULT_MANUALS } from './data/defaultManuals.ts';
 import { ManualDocument } from './types/manual.ts';
+import { cleanRawHtmlTags } from './utils/textFormatting.ts';
 
 dotenv.config();
 
@@ -215,6 +216,11 @@ REGLAS ESENCIALES DE CONVERSACIÓN:
 4. SI ALGO NO ESTÁ EN LOS MANUALES:
    Si te preguntan por un procedimiento laboral interno que no figura en los manuales de abajo, sé sincero como un buen compañero: "Oye, revisé nuestros manuales y no veo una política específica sobre eso. Para que no te quedes con la duda, te sugiero consultarlo con la gente de RRHH (rrhh-gestion@empresa.com) o con tu jefatura. Si tienes otra duda interna, ¡aquí estoy!".
 
+5. SÍMBOLOS, ENLACES Y CARACTERES ESPECIALES:
+   - Muestra todos los símbolos y caracteres especiales (<, >, &, %, $, #, @, *, °, ±, ≤, ≥, emojis) de manera limpia y natural.
+   - NUNCA generes etiquetas HTML crudas como <a target="_blank" rel="noopener noreferrer nofollow" ...> ni imprimas atributos de etiquetas en el texto.
+   - Si necesitas compartir una dirección web o enlace, hazlo en formato Markdown estándar [Texto del enlace](https://...) o escribe la URL directa.
+
 CONTEXTO DE MANUALES DE LA EMPRESA (MATERIAL DE REFERENCIA — NO TRANSCRIBIR COMPLETO, EXTRAER SOLO LO SOLICITADO):
 ${contextMarkdown}
 `;
@@ -255,7 +261,8 @@ ${contextMarkdown}
         );
 
         const response: any = await Promise.race([geminiPromise, timeoutPromise]);
-        const generatedText = response.text || '';
+        const rawGeneratedText = response.text || '';
+        const generatedText = cleanRawHtmlTags(rawGeneratedText);
 
         res.json({
           text: generatedText,
@@ -272,7 +279,7 @@ ${contextMarkdown}
     // Fallback or offline local grounded answer generator
     const localResult = generateLocalGroundedAnswer(message, searchResults, tone as any);
     res.json({
-      text: localResult.answer,
+      text: cleanRawHtmlTags(localResult.answer),
       citations: localResult.citations,
       engine: 'internal-manual-book',
       grounded: searchResults.length > 0
@@ -522,20 +529,20 @@ ${extractedText.slice(0, 35000)}
     const timestamp = Date.now();
     const finalManual: ManualDocument = {
       id: `man-upload-${timestamp}`,
-      title: manualData.title,
+      title: cleanRawHtmlTags(manualData.title),
       code: `MAN-${codePrefix}-${timestamp.toString().slice(-4)}`,
       category: manualData.category,
       department: manualData.department,
       version: manualData.version || '1.0',
       updatedDate: new Date().toISOString().split('T')[0],
-      summary: manualData.summary,
-      description: manualData.summary,
+      summary: cleanRawHtmlTags(manualData.summary),
+      description: cleanRawHtmlTags(manualData.summary),
       iconName: 'FileText',
       sections: manualData.sections.map((sec, idx) => ({
         id: `sec-${timestamp}-${idx + 1}`,
         articleNumber: sec.articleNumber || `Art. ${idx + 1}`,
-        title: sec.title || `Sección ${idx + 1}`,
-        content: sec.content || 'Sin detalles adicionales.',
+        title: cleanRawHtmlTags(sec.title || `Sección ${idx + 1}`),
+        content: cleanRawHtmlTags(sec.content || 'Sin detalles adicionales.'),
         tags: Array.isArray(sec.tags) && sec.tags.length > 0 ? sec.tags : [manualData!.category]
       }))
     };

@@ -23,6 +23,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { ChatMessage, Citation, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
+import { FormattedContent } from './FormattedContent';
 import { BOT_PROFILE, USER_PROFILE, getUserProfile, RenderAvatar, AvatarProfile } from '../data/avatars';
 
 interface ChatViewProps {
@@ -366,9 +367,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           : 'bg-[#262835] border border-[#3e4153] text-white rounded-2xl rounded-tl-xs'
                       }`}
                     >
-                      <div className="whitespace-pre-line select-text">
-                        {msg.content}
-                      </div>
+                      <FormattedContent
+                        content={msg.content}
+                        className={isUser ? 'text-white' : 'text-slate-100'}
+                      />
 
                       {!isUser && msg.citations && msg.citations.length > 0 && (
                         <div className="mt-2.5 pt-2 border-t border-[#3e4153] space-y-1">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, BookOpen, Check, Copy, MessageSquare, Tag, ExternalLink, Shield } from 'lucide-react';
 import { ManualDocument, ManualSection } from '../types/manual';
+import { FormattedContent } from './FormattedContent';
 
 interface ManualDrawerProps {
   isOpen: boolean;
@@ -99,10 +100,9 @@ export const ManualDrawer: React.FC<ManualDrawerProps> = ({
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Texto Oficial del Manual
             </h3>
-            <div
-              className="rich-text-rendered p-4 rounded-xl bg-[#262835] border border-[#3e4153] text-sm text-slate-200 leading-relaxed font-sans select-text"
-              dangerouslySetInnerHTML={{ __html: section.content }}
-            />
+            <div className="p-4 rounded-xl bg-[#262835] border border-[#3e4153] text-sm text-slate-200 leading-relaxed font-sans select-text">
+              <FormattedContent content={section.content} />
+            </div>
           </div>
 
           {/* Tags */}

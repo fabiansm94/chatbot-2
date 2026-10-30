@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/utils/manualSearch.test.ts src/utils/embedSnippet.test.ts src/utils/approvalWorkflow.test.ts src/utils/userChatThreads.test.ts"
+    "test": "tsx --test src/utils/manualSearch.test.ts src/utils/embedSnippet.test.ts src/utils/approvalWorkflow.test.ts src/utils/userChatThreads.test.ts src/utils/textFormatting.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
