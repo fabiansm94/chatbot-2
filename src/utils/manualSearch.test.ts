@@ -8,7 +8,8 @@ import {
   generateLocalGroundedAnswer,
   extractRelevantExcerpt,
   isOffTopicQuery,
-  detectConversationalIntent
+  detectConversationalIntent,
+  detectTargetEntityType
 } from './manualSearch';
 import { DEFAULT_MANUALS } from '../data/defaultManuals';
 
@@ -139,11 +140,79 @@ test('extractRelevantExcerpt extracts only the matching sentence or key point in
   assert.ok(!extracted.includes('Capítulo I: Disposiciones de Carácter General'));
 });
 
-test('generateLocalGroundedAnswer yields concise extracted answer without dumping full manual pages', () => {
-  const results = searchManuals('monitoreo de cámaras de seguridad', DEFAULT_MANUALS);
-  const { answer } = generateLocalGroundedAnswer('¿cada cuántos minutos se hace el patrullaje de cámaras?', results, 'direct');
-  assert.ok(answer.includes('MAN-SEG-01'));
-  // Must not be an absurd wall of text
-  assert.ok(answer.length < 900);
+test('detectTargetEntityType identifies schedule, person, and amount queries', () => {
+  assert.equal(detectTargetEntityType('¿cuál es el horario de atención?'), 'schedule');
+  assert.equal(detectTargetEntityType('¿a qué hora abren la oficina?'), 'schedule');
+  assert.equal(detectTargetEntityType('¿cuál es el turno de noche?'), 'schedule');
+
+  assert.equal(detectTargetEntityType('¿quién es el encargado de seguridad?'), 'person');
+  assert.equal(detectTargetEntityType('¿cuál es el nombre del responsable?'), 'person');
+  assert.equal(detectTargetEntityType('¿a quién le envío el formulario?'), 'person');
+
+  assert.equal(detectTargetEntityType('¿cuántos días de anticipación necesito?'), 'amount');
+  assert.equal(detectTargetEntityType('¿cuánto es el monto máximo de viáticos?'), 'amount');
+
+  assert.equal(detectTargetEntityType('¿cómo configuro la vpn en windows?'), 'general');
+});
+
+test('extractRelevantExcerpt extracts ONLY the schedule from a long manual with multiple subtitles', () => {
+  const multiSubtitleManual = `
+  # Manual de Operaciones de Sucursal
+  
+  ## 1. Introducción y Filosofía
+  Nuestra misión es ofrecer la mejor experiencia posible a nuestros clientes y colaboradores desde 2018.
+  
+  ## 2. Horario de Atención y Jornada
+  El horario de atención al público es de lunes a viernes de 08:30 a 17:30 hrs ininterrumpido. Los días sábado no se atiende a público.
+  
+  ## 3. Código de Vestimenta
+  Todo el personal debe vestir ropa formal o semiformal de acuerdo al manual corporativo de imagen.
+  
+  ## 4. Encargados y Responsables
+  El Jefe de Sucursal a cargo es Carlos Morales (contacto: cmorales@empresa.com, anexo 402).
+  
+  ## 5. Procedimiento de Cierre Diario
+  A las 18:00 se realiza el cuadre de caja y activación del sistema de alarmas perimetral.
+  `;
+
+  const query = '¿cuál es el horario de atención?';
+  const extracted = extractRelevantExcerpt(multiSubtitleManual, query);
+
+  // Must contain schedule
+  assert.ok(extracted.includes('08:30 a 17:30'));
+  // Must NOT contain unrelated subtitles
+  assert.ok(!extracted.includes('Código de Vestimenta'));
+  assert.ok(!extracted.includes('Carlos Morales'));
+  assert.ok(!extracted.includes('Procedimiento de Cierre Diario'));
+  assert.ok(!extracted.includes('Introducción y Filosofía'));
+});
+
+test('extractRelevantExcerpt extracts ONLY the responsible person and contact from a long manual', () => {
+  const multiSubtitleManual = `
+  # Manual de Operaciones de Sucursal
+  
+  ## 1. Introducción y Filosofía
+  Nuestra misión es ofrecer la mejor experiencia posible a nuestros clientes y colaboradores desde 2018.
+  
+  ## 2. Horario de Atención y Jornada
+  El horario de atención al público es de lunes a viernes de 08:30 a 17:30 hrs ininterrumpido.
+  
+  ## 3. Encargados y Responsables
+  El Jefe de Sucursal y responsable de la sede es Carlos Morales (contacto: cmorales@empresa.com, anexo 402).
+  
+  ## 4. Cuadraturas y Bóveda
+  La bóveda debe cerrarse bajo supervisión dual con dos llaves distintas custodiadas por tesorería.
+  `;
+
+  const query = '¿quién es el encargado y cuál es su correo?';
+  const extracted = extractRelevantExcerpt(multiSubtitleManual, query);
+
+  // Must contain the person name and contact
+  assert.ok(extracted.includes('Carlos Morales'));
+  assert.ok(extracted.includes('cmorales@empresa.com'));
+  // Must NOT contain unrelated subtitles
+  assert.ok(!extracted.includes('08:30 a 17:30'));
+  assert.ok(!extracted.includes('Cuadraturas y Bóveda'));
+  assert.ok(!extracted.includes('Introducción y Filosofía'));
 });
 

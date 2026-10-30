@@ -208,7 +208,7 @@ Manual: ${manual.title} (${manual.code}, v${manual.version})
 Departamento: ${manual.department}
 Artículo: ${section.articleNumber} - "${section.title}"
 Identificador: ${manual.id}#${section.id}
-${section.keyPoints && section.keyPoints.length > 0 ? `Puntos Clave del Artículo: ${section.keyPoints.join(' | ')}\n` : ''}Texto del Artículo (Úsalo como fuente de referencia para extraer ÚNICAMENTE lo que preguntó el usuario, NUNCA transcribas el texto completo):
+${section.keyPoints && section.keyPoints.length > 0 ? `Puntos Clave del Artículo: ${section.keyPoints.join(' | ')}\n` : ''}Texto del Artículo (INSTRUCCIÓN ESTRICTA: Si este texto contiene mucha información o varios subtítulos, extrae ÚNICAMENTE el dato específico que pidió el usuario —como horarios, nombres, plazos o requisitos puntuales— y descarta todos los demás subtítulos y texto no consultado. NUNCA transcribas el documento completo):
 ${section.content}
 ---`;
     })
@@ -231,8 +231,80 @@ export function extractCitations(results: SearchResult[]): Citation[] {
 }
 
 /**
- * Extracts only the specific, relevant sentence or paragraph answering the user's query,
- * preventing long walls of text or full verbatim manual dumps.
+ * Detects if a query is asking for a specific entity type:
+ * - schedule/hours
+ * - person/role/contact
+ * - amount/days/deadline
+ */
+export function detectTargetEntityType(query: string): 'schedule' | 'person' | 'amount' | 'general' {
+  const norm = normalizeText(query);
+
+  if (/\b(horario|horarios|hora|horas|hrs|a que hora|a que horas|turno|turnos|jornada|apertura|cierre|atencion|cuando abre|cuando cierra|frecuencia|cada cuanto)\b/i.test(norm)) {
+    return 'schedule';
+  }
+
+  if (/\b(quien|quienes|nombre|nombres|responsable|responsables|encargado|encargada|contacto|contactar|jefe|jefatura|coordinador|coordinadora|lider|con quien|a quien|quien autoriza|quien responde)\b/i.test(norm)) {
+    return 'person';
+  }
+
+  if (/\b(cuanto|cuantos|cuantas|plazo|plazos|anticipacion|dias|tiempo|fecha limite|monto|montos|viatico|viaticos|valor|tope|porcentaje|costo|pesos|dolar|\$)\b/i.test(norm)) {
+    return 'amount';
+  }
+
+  return 'general';
+}
+
+interface SubtitleBlock {
+  heading?: string;
+  text: string;
+}
+
+/**
+ * Splits manual content into discrete subtitle blocks if headers/sections exist
+ */
+function splitIntoSubtitleBlocks(content: string): SubtitleBlock[] {
+  const lines = content.split('\n');
+  const blocks: SubtitleBlock[] = [];
+  let currentHeading: string | undefined = undefined;
+  let currentLines: string[] = [];
+
+  const headingPattern = /^(?:#{1,6}\s+|(?:Art[íi]culo\s+\d+|Cap[íi]tulo\s+[IVXLCDM\d]+|\d+\.|\d+\.\d+\.?|[A-Za-z]\))\s*[:.-]?|[A-ZÁÉÍÓÚ\s\d]{3,40}:)(.+)?$/i;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      currentLines.push(line);
+      continue;
+    }
+
+    const match = trimmed.match(headingPattern);
+    if (match && trimmed.length < 80) {
+      if (currentLines.some(l => l.trim().length > 0)) {
+        blocks.push({
+          heading: currentHeading,
+          text: currentLines.join('\n').trim()
+        });
+      }
+      currentHeading = trimmed.replace(/^#+\s*/, '').replace(/:$/, '').trim();
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+
+  if (currentLines.some(l => l.trim().length > 0)) {
+    blocks.push({
+      heading: currentHeading,
+      text: currentLines.join('\n').trim()
+    });
+  }
+
+  return blocks.length > 0 ? blocks : [{ heading: undefined, text: content }];
+}
+
+/**
+ * Extracts only the specific, relevant data point (schedule, name, amount, or concise sentence)
+ * answering the user's query, filtering out unrelated subtitles and preventing full manual dumps.
  */
 export function extractRelevantExcerpt(
   content: string,
@@ -242,35 +314,159 @@ export function extractRelevantExcerpt(
   if (!content) return '';
 
   const keywords = extractKeywords(query);
+  const entityType = detectTargetEntityType(query);
 
-  // 1. If key points exist, see if any key point directly answers the query keywords
+  // 1. If key points exist, see if any key point directly answers the query
   if (keyPoints && keyPoints.length > 0 && keywords.length > 0) {
     const matchedPoints = keyPoints.filter(kp => {
       const normKp = normalizeText(kp);
-      return keywords.some(kw => normKp.includes(kw));
+      const kwMatch = keywords.some(kw => normKp.includes(kw));
+      if (!kwMatch) return false;
+      if (entityType === 'schedule') {
+        return /\b(\d{1,2}:\d{2}|\d+\s*(am|pm|hrs|horas|minutos|min)|turno|horario|cada\s+\d+)\b/i.test(normKp);
+      }
+      if (entityType === 'person') {
+        return /\b(responsable|encargad|jefe|coordinador|oficial|contacto|correo|email)\b/i.test(normKp);
+      }
+      if (entityType === 'amount') {
+        return /\b(\d+|plazo|anticipacion|dias|monto|\$)\b/i.test(normKp);
+      }
+      return true;
     });
 
     if (matchedPoints.length > 0) {
-      return matchedPoints.slice(0, 3).map(p => `• ${p}`).join('\n');
+      return matchedPoints.slice(0, 2).map(p => `• ${p}`).join('\n');
     }
   }
 
-  // 2. Split content into coherent blocks/paragraphs (by blank lines \n\s*\n)
-  const rawParagraphs = content
+  // 2. Break down into subtitle blocks if document has subsections
+  const blocks = splitIntoSubtitleBlocks(content);
+  let targetText = content;
+  let targetHeading: string | undefined = undefined;
+
+  if (blocks.length > 1) {
+    // Score blocks based on heading relevance and content relevance
+    let bestBlockScore = -1;
+    let bestBlock = blocks[0];
+
+    for (const b of blocks) {
+      let bScore = 0;
+      const normH = b.heading ? normalizeText(b.heading) : '';
+      const normT = normalizeText(b.text);
+
+      for (const kw of keywords) {
+        if (normH.includes(kw)) bScore += 35;
+        if (normT.includes(kw)) bScore += 8;
+      }
+
+      if (entityType === 'schedule') {
+        if (/\b(horario|hora|jornada|turno|atencion|apertura|cierre)\b/i.test(normH)) bScore += 45;
+        if (/\b(\d{1,2}:\d{2}|\d+\s*(hrs|horas|am|pm)|lunes a viernes)\b/i.test(normT)) bScore += 25;
+      } else if (entityType === 'person') {
+        if (/\b(responsable|encargad|contacto|jefe|personal|equipo)\b/i.test(normH)) bScore += 45;
+        if (/\b(@|responsable|encargad|jefe|coordinador)\b/i.test(normT)) bScore += 25;
+      } else if (entityType === 'amount') {
+        if (/\b(plazo|anticipacion|monto|valor|viatico|feriado|vacacion)\b/i.test(normH)) bScore += 45;
+        if (/\b(\d+\s*(dias|días|meses|semanas)|\$\s*\d+)\b/i.test(normT)) bScore += 25;
+      }
+
+      if (bScore > bestBlockScore) {
+        bestBlockScore = bScore;
+        bestBlock = b;
+      }
+    }
+
+    if (bestBlockScore > 10) {
+      targetText = bestBlock.text;
+      targetHeading = bestBlock.heading;
+
+      // If the matched block is already concise (under 320 chars, e.g. 1-2 sentences), return it directly!
+      if (targetText.length <= 320) {
+        return targetText.trim();
+      }
+    }
+  }
+
+  // 3. Entity-specific sentence extraction
+  // Split targetText into clean sentences
+  const sentences = targetText
+    .split(/(?<=[.!?\n])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 8);
+
+  const scoredSentences: { sentence: string; score: number }[] = [];
+
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i];
+    const norm = normalizeText(s);
+    let score = 0;
+
+    for (const kw of keywords) {
+      if (norm.includes(kw)) score += 12;
+    }
+
+    if (entityType === 'schedule') {
+      if (/\b(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm|hrs|horas)|de\s+\d{1,2}[:\d]*\s*a\s*\d{1,2}[:\d]*|lunes a viernes|lunes a sabado|cada\s+\d+\s*(minutos|min|hrs|horas)|turno|horario)\b/i.test(norm)) {
+        score += 35;
+      }
+    } else if (entityType === 'person') {
+      if (/\b(responsable|encargad[oa]|jefe|jefatura|coordinador[a]?|oficial|supervisor[a]?|gerente|operador|director[a]?|contacto|correo|email|anexo|telefono)\b/i.test(norm)) {
+        score += 35;
+      }
+      if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(s)) {
+        score += 25;
+      }
+    } else if (entityType === 'amount') {
+      if (/\b(\d+\s*(dias|días|meses|semanas|horas|minutos|uf|clp|pesos|\%)|\$\s*[\d.]+|\b\d+\s*dias corridos|\b\d+\s*dias habiles|\banticipacion\b|\bplazo\b)\b/i.test(norm)) {
+        score += 35;
+      }
+    }
+
+    if (score > 0) {
+      scoredSentences.push({ sentence: s, score });
+    }
+  }
+
+  if (scoredSentences.length > 0) {
+    scoredSentences.sort((a, b) => b.score - a.score);
+    const top = scoredSentences[0];
+
+    // If we have a high-confidence entity sentence, return it directly!
+    if (top.score >= 20 || entityType !== 'general') {
+      let result = top.sentence;
+      // If there is an immediate complementary sentence that adds critical clarification (e.g. Saturdays, email, details)
+      const topIdx = sentences.indexOf(top.sentence);
+      if (topIdx !== -1 && topIdx + 1 < sentences.length) {
+        const next = sentences[topIdx + 1];
+        if (next.length < 120 && (
+          /^(los|las|el|en|anexo|correo|telefono|contacto|nota|importante)\b/i.test(next.trim()) ||
+          /\b(sabado|domingo|festivo|excepcion|correo|anexo)\b/i.test(normalizeText(next))
+        )) {
+          result = `${result} ${next}`;
+        }
+      }
+
+      if (targetHeading && !result.toLowerCase().includes(targetHeading.toLowerCase())) {
+        return `**${targetHeading}:** ${result}`;
+      }
+      return result;
+    }
+  }
+
+  // 4. Paragraph scoring fallback for general queries
+  const rawParagraphs = targetText
     .split(/\n\s*\n/)
     .map(p => p.trim())
     .filter(p => p.length > 10);
 
   const paragraphs = rawParagraphs.length > 1
     ? rawParagraphs
-    : content.split('\n').map(p => p.trim()).filter(p => p.length > 10);
+    : targetText.split('\n').map(p => p.trim()).filter(p => p.length > 10);
 
-  // If content is already very brief (<= 180 chars), return it as is
-  if (paragraphs.length <= 1 && content.length <= 180) {
-    return content.trim();
+  if (paragraphs.length <= 1 && targetText.length <= 220) {
+    return targetText.trim();
   }
 
-  // 3. Score paragraphs by keyword matches & presence of specific terms/numbers
   const scoredParagraphs: { text: string; score: number }[] = [];
 
   for (const para of paragraphs) {
@@ -279,7 +475,6 @@ export function extractRelevantExcerpt(
     for (const kw of keywords) {
       if (norm.includes(kw)) score += 10;
     }
-    // Boost paragraphs with numbers, days, requirements, steps, deadlines
     if (/\b(\d+|dias|horas|meses|semanas|plazo|requisito|monto|\$|porcentaje|art|portal|formulario)\b/i.test(norm)) {
       score += 3;
     }
@@ -291,39 +486,15 @@ export function extractRelevantExcerpt(
   if (scoredParagraphs.length > 0) {
     scoredParagraphs.sort((a, b) => b.score - a.score);
     const top = scoredParagraphs[0];
-
-    // If the top paragraph is a clear strong match or subsequent ones are noticeably weaker, return only the top paragraph
-    if (
-      scoredParagraphs.length === 1 ||
-      scoredParagraphs[1].score < top.score * 0.65 ||
-      top.score >= 25
-    ) {
-      return top.text;
+    if (targetHeading && !top.text.toLowerCase().includes(targetHeading.toLowerCase())) {
+      return `**${targetHeading}:**\n${top.text}`;
     }
-
-    // Otherwise return at most top 2 paragraphs
-    const topParagraphs = scoredParagraphs.slice(0, 2).map(p => p.text);
-    return topParagraphs.join('\n\n');
+    return top.text;
   }
 
-  // 4. If no paragraph scored with keywords, inspect individual sentences
-  const sentences = content
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 15);
-
-  for (const sentence of sentences) {
-    const norm = normalizeText(sentence);
-    for (const kw of keywords) {
-      if (norm.includes(kw)) {
-        return sentence;
-      }
-    }
-  }
-
-  // 5. Fallback: return ONLY the first paragraph (clipped to 220 chars) instead of dumping the whole manual
-  const first = paragraphs[0] || content.slice(0, 200);
-  return first.length > 220 ? first.slice(0, 220).trim() + '...' : first;
+  // 5. Fallback: first sentence or first concise snippet
+  const first = sentences[0] || targetText.slice(0, 180);
+  return first.length > 200 ? first.slice(0, 200).trim() + '...' : first;
 }
 
 /**
