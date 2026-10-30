@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import mammoth from 'mammoth';
+import { PDFParse } from 'pdf-parse';
 import {
   searchManuals,
   buildManualContext,
@@ -16,7 +18,7 @@ dotenv.config();
 
 export const app = express();
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // Enable CORS for embedding into external company websites / intranets / Vercel
 app.use((req, res, next) => {
@@ -190,23 +192,30 @@ Tu personalidad: Hablas con tus compañeros como un amigo del trabajo: eres cerc
 
 REGLAS ESENCIALES DE CONVERSACIÓN:
 
-1. LÍMITE AMISTOSO PARA TEMAS FUERA DE LUGAR (OFF-TOPIC):
+1. REGLA DE ORO — RESPUESTAS PUNTUALES, PRECISAS Y CONCISAS (PROHIBIDO VOLCAR EL MANUAL COMPLETO):
+   - El usuario te pregunta por un aspecto o dato ESPECÍFICO de un manual (por ejemplo: un plazo de anticipación, un monto o viático, un requisito puntual, una contraseña mínima, o los pasos inmediatos).
+   - ESTÁ ESTRICTAMENTE PROHIBIDO copiar, transcribir o verter el manual entero, o pegar artículos largos de principio a fin.
+   - Extrae y explica ÚNICAMENTE la parte o dato exacto que responde a la consulta del usuario.
+   - Responde de forma breve y sintética (máximo 1 a 3 párrafos cortos o una lista puntual concisa).
+   - Si los manuales de referencia contienen páginas enteras, introducciones o cláusulas adicionales que el usuario NO preguntó, OMÍTELAS por completo.
+   - Cita siempre la referencia oficial entre corchetes (ej. "[MAN-RRHH-01: Art. 4.1]") para que el trabajador sepa dónde está el documento completo en el Book si desea leerlo todo por su cuenta, pero jamás transcribas el documento entero en el chat.
+
+2. LÍMITE AMISTOSO PARA TEMAS FUERA DE LUGAR (OFF-TOPIC):
    Si el trabajador te pregunta sobre cosas que nada que ver con el trabajo —por ejemplo: anime (como Naruto, Dragon Ball, One Piece), películas, videojuegos, chistes, deportes o fútbol, recetas de cocina, tareas del colegio o cultura general— NO seas robótico, ni digas "Error", ni te comportes como una pared fría.
    En su lugar, respóndele con humor, simpatía y naturalidad de compañero de oficina, pero dejando en claro con buena onda que tu terreno son los manuales de la empresa.
    Por ejemplo:
    - "¡Jajaja, me encantaría debatir si Naruto o Sasuke tenían razón, pero aquí en la oficina me tienen contratado al 100% para resolver tus dudas de la empresa! 😂 Si necesitas saber de tus vacaciones, seguros, permisos, viáticos o temas de TI, ¡ahí sí soy tu experto! ¿Te doy una mano con algo del trabajo?"
    - "¡Uff, suena genial! Pero mi especialidad son las normativas, beneficios y procedimientos de la empresa. Pregúntame sobre tus días libres, licencias o trámites internos y lo resolvemos al tiro."
 
-2. INFORMACIÓN LABORAL BASADA EN LOS MANUALES:
+3. INFORMACIÓN LABORAL BASADA EN LOS MANUALES:
    Cuando te pregunten sobre temas de la empresa (vacaciones, seguros médicos, permisos, ciberseguridad, viáticos, denuncias, teletrabajo, etc.):
    - Basa siempre tus respuestas en los manuales indexados que tienes abajo.
-   - Explica las cosas de forma fácil de entender, destacando los números y plazos reales (ej. 22 días hábiles, 15 días de anticipación, contraseñas de 14 caracteres, etc.).
-   - Cita de forma natural el manual o artículo oficial respectivo, por ejemplo: "[MAN-RRHH-01: Art. 4.1]".
+   - Explica las cosas de forma fácil de entender, destacando con claridad los números, plazos o condiciones reales aplicables.
 
-3. SI ALGO NO ESTÁ EN LOS MANUALES:
+4. SI ALGO NO ESTÁ EN LOS MANUALES:
    Si te preguntan por un procedimiento laboral interno que no figura en los manuales de abajo, sé sincero como un buen compañero: "Oye, revisé nuestros manuales y no veo una política específica sobre eso. Para que no te quedes con la duda, te sugiero consultarlo con la gente de RRHH (rrhh-gestion@empresa.com) o con tu jefatura. Si tienes otra duda interna, ¡aquí estoy!".
 
-CONTEXTO DE MANUALES DE LA EMPRESA:
+CONTEXTO DE MANUALES DE LA EMPRESA (MATERIAL DE REFERENCIA — NO TRANSCRIBIR COMPLETO, EXTRAER SOLO LO SOLICITADO):
 ${contextMarkdown}
 `;
 
@@ -237,7 +246,7 @@ ${contextMarkdown}
           contents: formattedContents,
           config: {
             systemInstruction,
-            temperature: 0.45, // Balanced for friendly, natural coworker conversation while preserving facts
+            temperature: 0.35, // Balanced for friendly coworker conversation while maintaining concise precision
           }
         });
 
@@ -296,4 +305,256 @@ app.post('/api/search', (req: Request, res: Response) => {
       score: r.score
     }))
   });
+});
+
+// Parse uploaded PDF and Word (DOCX/DOC) documents
+app.post('/api/parse-document', async (req: Request, res: Response) => {
+  try {
+    const { fileName, fileBase64, mimeType } = req.body;
+    if (!fileBase64 || !fileName) {
+      res.status(400).json({ error: 'Faltan datos del archivo (fileName o fileBase64)' });
+      return;
+    }
+
+    const buffer = Buffer.from(fileBase64, 'base64');
+    const lowerName = fileName.toLowerCase();
+    const isPdf = lowerName.endsWith('.pdf') || (mimeType && mimeType.includes('pdf'));
+    const isDocx = lowerName.endsWith('.docx') || lowerName.endsWith('.doc') || (mimeType && (mimeType.includes('word') || mimeType.includes('officedocument')));
+
+    let extractedText = '';
+
+    if (isDocx) {
+      const mammothAny = (mammoth as any).default || mammoth;
+      const result = await mammothAny.extractRawText({ buffer });
+      extractedText = result.value || '';
+    } else if (isPdf) {
+      const PDFParseClass = (PDFParse as any);
+      if (typeof PDFParseClass === 'function' && PDFParseClass.prototype?.load) {
+        const parser = new PDFParseClass({ data: buffer });
+        await parser.load();
+        const textResult = await parser.getText();
+        extractedText = textResult.text || '';
+      } else if (typeof PDFParseClass === 'function') {
+        const textResult = await (PDFParseClass as any)(buffer);
+        extractedText = textResult.text || '';
+      }
+    } else {
+      extractedText = buffer.toString('utf-8');
+    }
+
+    if (!extractedText.trim()) {
+      res.status(422).json({
+        error: 'No se pudo extraer texto legible del archivo. Verifica que el archivo no esté protegido con contraseña o dañado.'
+      });
+      return;
+    }
+
+    let manualData: {
+      title: string;
+      category: 'rrhh' | 'seguridad' | 'ti' | 'legal_etica' | 'operaciones' | 'general';
+      department: string;
+      version: string;
+      summary: string;
+      sections: Array<{
+        articleNumber: string;
+        title: string;
+        content: string;
+        tags: string[];
+      }>;
+    } | null = null;
+
+    const aiClient = getAiClient();
+    let parsedWithAi = false;
+
+    if (aiClient) {
+      try {
+        const prompt = `Analiza el siguiente texto extraído de un documento oficial de la empresa (PDF o Word) con nombre de archivo "${fileName}".
+Devuelve ÚNICAMENTE un objeto JSON válido con la siguiente estructura exacta:
+{
+  "title": "Título conciso y oficial del manual o procedimiento",
+  "category": "rrhh" | "ti" | "seguridad" | "legal_etica" | "operaciones" | "general",
+  "department": "Departamento responsable",
+  "version": "1.0",
+  "summary": "Resumen claro de 2 a 3 oraciones de la política o procedimiento",
+  "sections": [
+    {
+      "articleNumber": "Art. 1" (o número de artículo/sección correlativo),
+      "title": "Título breve y descriptivo de la cláusula o procedimiento",
+      "content": "Texto detallado con sus reglas o indicaciones",
+      "tags": ["etiqueta1", "etiqueta2"]
+    }
+  ]
+}
+
+Si el documento no tiene divisiones explícitas de artículos, organízalo en secciones lógicas y claras (mínimo 2 y máximo 8 secciones).
+TEXTO DEL DOCUMENTO:
+${extractedText.slice(0, 35000)}
+`;
+
+        const response: any = await Promise.race([
+          aiClient.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: {
+              temperature: 0.2,
+              responseMimeType: 'application/json'
+            }
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('AI parsing timeout')), 14000))
+        ]);
+
+        const rawJson = response.text?.trim() || '';
+        const cleanedJson = rawJson.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim();
+        const jsonResult = JSON.parse(cleanedJson);
+
+        if (jsonResult && jsonResult.title && Array.isArray(jsonResult.sections) && jsonResult.sections.length > 0) {
+          manualData = jsonResult;
+          parsedWithAi = true;
+        }
+      } catch (aiErr) {
+        console.warn('[ManualBot Server] AI document parsing failed or timed out, using heuristic fallback:', aiErr);
+      }
+    }
+
+    if (!manualData) {
+      const cleanTitle = fileName
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[_-]/g, ' ')
+        .replace(/\b\w/g, (l: string) => l.toUpperCase())
+        .trim();
+
+      const lowerText = extractedText.toLowerCase();
+      let category: 'rrhh' | 'seguridad' | 'ti' | 'legal_etica' | 'operaciones' | 'general' = 'general';
+      let department = 'Dirección General';
+
+      if (lowerText.includes('vacaci') || lowerText.includes('remuneraci') || lowerText.includes('licencia') || lowerText.includes('empleado') || lowerText.includes('beneficio') || lowerText.includes('rrhh')) {
+        category = 'rrhh';
+        department = 'Recursos Humanos & Gestión de Talento';
+      } else if (lowerText.includes('ciberseguridad') || lowerText.includes('contraseña') || lowerText.includes('vpn') || lowerText.includes('software') || lowerText.includes('antivirus') || lowerText.includes('red')) {
+        category = 'ti';
+        department = 'Tecnología e Información (TI)';
+      } else if (lowerText.includes('accidente') || lowerText.includes('evacuaci') || lowerText.includes('epp') || lowerText.includes('extintor') || lowerText.includes('sst') || lowerText.includes('seguridad')) {
+        category = 'seguridad';
+        department = 'Prevención de Riesgos y Seguridad';
+      } else if (lowerText.includes('etica') || lowerText.includes('conducta') || lowerText.includes('confidencial') || lowerText.includes('denuncia') || lowerText.includes('anticorrupci')) {
+        category = 'legal_etica';
+        department = 'Legal y Cumplimiento Normativo';
+      } else if (lowerText.includes('viatico') || lowerText.includes('reembolso') || lowerText.includes('gasto') || lowerText.includes('proveedor') || lowerText.includes('compra')) {
+        category = 'operaciones';
+        department = 'Administración y Finanzas';
+      }
+
+      const articleRegex = /(?:^|\n)(?:Artículo|Art\.|Capítulo|Cap\.|Sección|Sec\.|Cláusula)\s*([0-9A-Za-z\.\-]+)[\.:\- ]*(.*?)(?=\n(?:Artículo|Art\.|Capítulo|Cap\.|Sección|Sec\.|Cláusula)\s*[0-9A-Za-z\.\-]+|\n\n\n|$)/gis;
+      const sections: Array<{ articleNumber: string; title: string; content: string; tags: string[] }> = [];
+
+      let match;
+      let count = 0;
+      while ((match = articleRegex.exec(extractedText)) !== null && count < 20) {
+        count++;
+        const artNum = `Art. ${match[1].trim()}`;
+        const header = match[2]?.trim() || `Artículo ${match[1]}`;
+        const headerLines = header.split('\n');
+        const artTitle = (headerLines[0] || `Disposición ${count}`).slice(0, 80).trim();
+        const content = (headerLines.slice(1).join('\n') || match[0]).trim();
+        if (content.length > 10) {
+          sections.push({
+            articleNumber: artNum,
+            title: artTitle || `Norma ${count}`,
+            content: content.slice(0, 3000),
+            tags: [category, 'documento']
+          });
+        }
+      }
+
+      if (sections.length === 0) {
+        const paragraphs = extractedText
+          .split(/\n\s*\n/)
+          .map(p => p.trim())
+          .filter(p => p.length > 40);
+
+        if (paragraphs.length > 0) {
+          const chunkSize = Math.max(1, Math.ceil(paragraphs.length / 5));
+          for (let i = 0; i < paragraphs.length && sections.length < 6; i += chunkSize) {
+            const chunk = paragraphs.slice(i, i + chunkSize).join('\n\n');
+            const lines = chunk.split('\n');
+            const firstLine = lines[0].replace(/^[#\*\-0-9\.\s]+/, '').trim().slice(0, 70);
+            sections.push({
+              articleNumber: `Art. ${sections.length + 1}`,
+              title: firstLine || `Sección ${sections.length + 1}`,
+              content: chunk.slice(0, 3000),
+              tags: [category, 'oficial']
+            });
+          }
+        } else {
+          sections.push({
+            articleNumber: 'Art. 1',
+            title: 'Contenido General del Documento',
+            content: extractedText.slice(0, 3000),
+            tags: [category]
+          });
+        }
+      }
+
+      const cleanSummary = extractedText
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 280) + '...';
+
+      manualData = {
+        title: cleanTitle || 'Manual Corporativo',
+        category,
+        department,
+        version: '1.0',
+        summary: cleanSummary,
+        sections
+      };
+    }
+
+    const codePrefix = {
+      rrhh: 'RRHH',
+      ti: 'TI',
+      seguridad: 'SST',
+      legal_etica: 'ETICA',
+      operaciones: 'OPER',
+      general: 'GEN'
+    }[manualData.category] || 'MAN';
+
+    const timestamp = Date.now();
+    const finalManual: ManualDocument = {
+      id: `man-upload-${timestamp}`,
+      title: manualData.title,
+      code: `MAN-${codePrefix}-${timestamp.toString().slice(-4)}`,
+      category: manualData.category,
+      department: manualData.department,
+      version: manualData.version || '1.0',
+      updatedDate: new Date().toISOString().split('T')[0],
+      summary: manualData.summary,
+      description: manualData.summary,
+      iconName: 'FileText',
+      sections: manualData.sections.map((sec, idx) => ({
+        id: `sec-${timestamp}-${idx + 1}`,
+        articleNumber: sec.articleNumber || `Art. ${idx + 1}`,
+        title: sec.title || `Sección ${idx + 1}`,
+        content: sec.content || 'Sin detalles adicionales.',
+        tags: Array.isArray(sec.tags) && sec.tags.length > 0 ? sec.tags : [manualData!.category]
+      }))
+    };
+
+    res.json({
+      success: true,
+      parsedWithAi,
+      manual: finalManual,
+      stats: {
+        characters: extractedText.length,
+        sectionsCount: finalManual.sections.length,
+        fileName
+      }
+    });
+  } catch (error: any) {
+    console.error('[ManualBot Server] Error parsing document:', error);
+    res.status(500).json({
+      error: 'Error al procesar el archivo PDF o Word.',
+      details: error?.message || String(error)
+    });
+  }
 });

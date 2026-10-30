@@ -36,8 +36,22 @@ export default function App() {
   const [drawerSection, setDrawerSection] = useState<ManualSection | null>(null);
 
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addModalInitialFile, setAddModalInitialFile] = useState<File | null>(null);
+  const [addModalDefaultTab, setAddModalDefaultTab] = useState<'upload' | 'manual'>('upload');
   const [proposeModalOpen, setProposeModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleOpenUploadModal = () => {
+    setAddModalInitialFile(null);
+    setAddModalDefaultTab('upload');
+    setAddModalOpen(true);
+  };
+
+  const handleUploadFileDirectly = (file: File) => {
+    setAddModalInitialFile(file);
+    setAddModalDefaultTab('upload');
+    setAddModalOpen(true);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -445,7 +459,13 @@ export default function App() {
             <ManualsBookView
               manuals={manuals}
               onOpenSection={handleOpenSection}
-              onOpenAddModal={() => setAddModalOpen(true)}
+              onOpenAddModal={() => {
+                setAddModalInitialFile(null);
+                setAddModalDefaultTab('manual');
+                setAddModalOpen(true);
+              }}
+              onOpenUploadModal={handleOpenUploadModal}
+              onUploadFile={handleUploadFileDirectly}
               onResetManuals={handleResetManuals}
               onAskAboutManual={handleAskAboutManual}
               onDeleteManual={handleDeleteManual}
@@ -504,8 +524,13 @@ export default function App() {
 
       <AddManualModal
         isOpen={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
+        onClose={() => {
+          setAddModalOpen(false);
+          setAddModalInitialFile(null);
+        }}
         onAddManual={handleAddManual}
+        initialFile={addModalInitialFile}
+        defaultTab={addModalDefaultTab}
       />
 
       <ProposeKnowledgeModal

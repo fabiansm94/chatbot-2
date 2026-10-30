@@ -6,6 +6,7 @@ import {
   searchManuals,
   buildManualContext,
   generateLocalGroundedAnswer,
+  extractRelevantExcerpt,
   isOffTopicQuery,
   detectConversationalIntent
 } from './manualSearch';
@@ -113,3 +114,36 @@ test('generateLocalGroundedAnswer gives friendly redirection for off-topic quest
   assert.ok(answer.includes('empresa') || answer.includes('oficina'));
   assert.equal(citations.length, 0);
 });
+
+test('extractRelevantExcerpt extracts only the matching sentence or key point instead of dumping whole manual', () => {
+  const longManualText = `
+  Capítulo I: Disposiciones de Carácter General y Ámbito de Aplicación.
+  El presente reglamento tiene por objeto establecer las normas básicas que rigen la relación laboral entre la empresa y todos sus trabajadores dependientes.
+  
+  Artículo 15: Régimen Anual de Feriado y Vacaciones.
+  Todo colaborador con contrato indefinido tiene derecho a un feriado anual de 22 días hábiles con remuneración íntegra.
+  La solicitud deberá ingresarse con al menos 15 días corridos de anticipación en el portal de autoservicio de la intranet.
+  
+  Artículo 16: Rendición y Gastos de Viaje.
+  Los gastos incurridos por concepto de traslados y alimentación deberán ser rendidos dentro de los 5 días hábiles siguientes al término de la comisión.
+  `;
+
+  const query = '¿cuántos días de vacaciones me corresponden y con cuánta anticipación debo pedirlas?';
+  const extracted = extractRelevantExcerpt(longManualText, query);
+
+  // Must include the specific vacation rules
+  assert.ok(extracted.includes('22 días'));
+  assert.ok(extracted.includes('15 días'));
+  // Must NOT include unrelated long sections like Article 16 or general introduction
+  assert.ok(!extracted.includes('Artículo 16: Rendición'));
+  assert.ok(!extracted.includes('Capítulo I: Disposiciones de Carácter General'));
+});
+
+test('generateLocalGroundedAnswer yields concise extracted answer without dumping full manual pages', () => {
+  const results = searchManuals('monitoreo de cámaras de seguridad', DEFAULT_MANUALS);
+  const { answer } = generateLocalGroundedAnswer('¿cada cuántos minutos se hace el patrullaje de cámaras?', results, 'direct');
+  assert.ok(answer.includes('MAN-SEG-01'));
+  // Must not be an absurd wall of text
+  assert.ok(answer.length < 900);
+});
+

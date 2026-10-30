@@ -9,7 +9,7 @@ const SPANISH_STOPWORDS = new Set([
   'ellos', 'e', 'esto', 'mi', 'antes', 'algunos', 'que', 'unos', 'yo', 'otro', 'otras',
   'otra', 'el', 'tanto', 'esa', 'estos', 'mucho', 'quienes', 'nada', 'muchos', 'cual',
   'sea', 'poco', 'ella', 'estar', 'haber', 'estas', 'estaba', 'estamos', 'algunas', 'algo',
-  'nosotros', 'hola', 'buenas', 'buenos', 'dias', 'tardes', 'noches', 'favor', 'quisiera', 'saber',
+  'nosotros', 'hola', 'buenas', 'buenos', 'tardes', 'noches', 'favor', 'quisiera', 'saber',
   'gracias', 'muchas', 'chao', 'adios'
 ]);
 
@@ -203,14 +203,13 @@ export function buildManualContext(results: SearchResult[]): string {
   return results
     .map((res, index) => {
       const { manual, section } = res;
-      return `### [DOCUMENTO ${index + 1}]
+      return `### [REFERENCIA ${index + 1}]
 Manual: ${manual.title} (${manual.code}, v${manual.version})
 Departamento: ${manual.department}
 Artículo: ${section.articleNumber} - "${section.title}"
 Identificador: ${manual.id}#${section.id}
-Contenido Oficial:
+${section.keyPoints && section.keyPoints.length > 0 ? `Puntos Clave del Artículo: ${section.keyPoints.join(' | ')}\n` : ''}Texto del Artículo (Úsalo como fuente de referencia para extraer ÚNICAMENTE lo que preguntó el usuario, NUNCA transcribas el texto completo):
 ${section.content}
-${section.keyPoints && section.keyPoints.length > 0 ? `Puntos Clave: ${section.keyPoints.join(' | ')}` : ''}
 ---`;
     })
     .join('\n\n');
@@ -232,7 +231,104 @@ export function extractCitations(results: SearchResult[]): Citation[] {
 }
 
 /**
- * Friendly, coworker-styled grounded answer generator with polite boundary for off-topic queries
+ * Extracts only the specific, relevant sentence or paragraph answering the user's query,
+ * preventing long walls of text or full verbatim manual dumps.
+ */
+export function extractRelevantExcerpt(
+  content: string,
+  query: string,
+  keyPoints?: string[]
+): string {
+  if (!content) return '';
+
+  const keywords = extractKeywords(query);
+
+  // 1. If key points exist, see if any key point directly answers the query keywords
+  if (keyPoints && keyPoints.length > 0 && keywords.length > 0) {
+    const matchedPoints = keyPoints.filter(kp => {
+      const normKp = normalizeText(kp);
+      return keywords.some(kw => normKp.includes(kw));
+    });
+
+    if (matchedPoints.length > 0) {
+      return matchedPoints.slice(0, 3).map(p => `• ${p}`).join('\n');
+    }
+  }
+
+  // 2. Split content into coherent blocks/paragraphs (by blank lines \n\s*\n)
+  const rawParagraphs = content
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    .filter(p => p.length > 10);
+
+  const paragraphs = rawParagraphs.length > 1
+    ? rawParagraphs
+    : content.split('\n').map(p => p.trim()).filter(p => p.length > 10);
+
+  // If content is already very brief (<= 180 chars), return it as is
+  if (paragraphs.length <= 1 && content.length <= 180) {
+    return content.trim();
+  }
+
+  // 3. Score paragraphs by keyword matches & presence of specific terms/numbers
+  const scoredParagraphs: { text: string; score: number }[] = [];
+
+  for (const para of paragraphs) {
+    const norm = normalizeText(para);
+    let score = 0;
+    for (const kw of keywords) {
+      if (norm.includes(kw)) score += 10;
+    }
+    // Boost paragraphs with numbers, days, requirements, steps, deadlines
+    if (/\b(\d+|dias|horas|meses|semanas|plazo|requisito|monto|\$|porcentaje|art|portal|formulario)\b/i.test(norm)) {
+      score += 3;
+    }
+    if (score > 0) {
+      scoredParagraphs.push({ text: para, score });
+    }
+  }
+
+  if (scoredParagraphs.length > 0) {
+    scoredParagraphs.sort((a, b) => b.score - a.score);
+    const top = scoredParagraphs[0];
+
+    // If the top paragraph is a clear strong match or subsequent ones are noticeably weaker, return only the top paragraph
+    if (
+      scoredParagraphs.length === 1 ||
+      scoredParagraphs[1].score < top.score * 0.65 ||
+      top.score >= 25
+    ) {
+      return top.text;
+    }
+
+    // Otherwise return at most top 2 paragraphs
+    const topParagraphs = scoredParagraphs.slice(0, 2).map(p => p.text);
+    return topParagraphs.join('\n\n');
+  }
+
+  // 4. If no paragraph scored with keywords, inspect individual sentences
+  const sentences = content
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 15);
+
+  for (const sentence of sentences) {
+    const norm = normalizeText(sentence);
+    for (const kw of keywords) {
+      if (norm.includes(kw)) {
+        return sentence;
+      }
+    }
+  }
+
+  // 5. Fallback: return ONLY the first paragraph (clipped to 220 chars) instead of dumping the whole manual
+  const first = paragraphs[0] || content.slice(0, 200);
+  return first.length > 220 ? first.slice(0, 220).trim() + '...' : first;
+}
+
+/**
+ * Friendly, coworker-styled grounded answer generator with polite boundary for off-topic queries.
+ * Synthesizes and extracts ONLY the specific part requested by the user, avoiding dumping entire manuals.
  */
 export function generateLocalGroundedAnswer(
   query: string,
@@ -266,41 +362,37 @@ export function generateLocalGroundedAnswer(
 
   const primary = results[0];
   const citations = extractCitations(results);
+  const relevantExcerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
 
   let answer = '';
 
   if (tone === 'steps') {
-    answer = `¡Hola! Claro que sí, aquí te dejo el paso a paso ordenado según lo que indica el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]):\n\n`;
+    answer = `¡Hola! Claro que sí, aquí tienes puntualmente lo que indica el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]):\n\n`;
     if (primary.section.keyPoints && primary.section.keyPoints.length > 0) {
       primary.section.keyPoints.forEach((point, i) => {
         answer += `${i + 1}. **${point}**\n`;
       });
-      answer += `\n**Para tener en cuenta:**\n${primary.section.content}\n`;
+      if (relevantExcerpt && !primary.section.keyPoints.some(kp => relevantExcerpt.includes(kp))) {
+        answer += `\n**Dato puntual:**\n${relevantExcerpt}\n`;
+      }
     } else {
-      answer += `${primary.section.content}\n`;
+      answer += `${relevantExcerpt}\n`;
     }
-    answer += `\nCualquier duda que te surja en el proceso, avísame y lo revisamos juntos. ¡Mucho éxito!`;
+    answer += `\n*(Cualquier duda adicional, puedes revisar la referencia completa [${primary.section.articleNumber}] abajo).*`;
   } else if (tone === 'detailed') {
-    answer = `¡Qué bueno que preguntas! Te comparto el detalle completo de lo que tenemos establecido en el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber} - *${primary.section.title}*]):\n\n`;
-    answer += `${primary.section.content}\n\n`;
+    answer = `¡Hola! Te comparto la parte específica que aplica según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber} - *${primary.section.title}*]):\n\n`;
+    answer += `${relevantExcerpt}\n\n`;
     if (primary.section.keyPoints && primary.section.keyPoints.length > 0) {
-      answer += `**Puntos clave que no debes olvidar:**\n`;
-      primary.section.keyPoints.forEach(kp => {
+      answer += `**Puntos clave:**\n`;
+      primary.section.keyPoints.slice(0, 3).forEach(kp => {
         answer += `- ${kp}\n`;
       });
     }
-    if (results.length > 1) {
-      const secondary = results[1];
-      answer += `\n*Dato adicional:* En el documento **${secondary.manual.title}** [${secondary.manual.code}: ${secondary.section.articleNumber}] también se menciona que: ${secondary.section.content.slice(0, 140)}...`;
-    }
   } else {
-    // Direct but friendly coworker tone
-    answer = `¡Hola! Mira, según lo establecido en el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]), la cosa funciona así:\n\n`;
-    if (primary.section.keyPoints && primary.section.keyPoints.length > 0) {
-      answer += primary.section.keyPoints.map(kp => `• ${kp}`).join('\n') + '\n\n';
-    }
-    answer += `${primary.section.content.split('\n')[0]}\n\n`;
-    answer += `*(Si necesitas revisar la cláusula oficial completa, puedes ver la referencia [${primary.section.articleNumber}] que te dejé abajo). ¡Espero te sirva!*`;
+    // Direct and concise coworker tone (never dumps the whole manual)
+    answer = `¡Hola! Mira, sobre lo que preguntas, el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]) establece puntualmente lo siguiente:\n\n`;
+    answer += `${relevantExcerpt}\n\n`;
+    answer += `*(Si deseas ver el artículo completo, abajo tienes la referencia oficial [${primary.section.articleNumber}]).*`;
   }
 
   return {
