@@ -195,7 +195,7 @@ export function searchManuals(
 /**
  * Builds formatted context markdown for Gemini RAG prompt
  */
-export function buildManualContext(results: SearchResult[]): string {
+export function buildManualContext(results: SearchResult[], query?: string): string {
   if (results.length === 0) {
     return 'No se encontraron artículos directamente coincidentes en los manuales indexados.';
   }
@@ -203,12 +203,14 @@ export function buildManualContext(results: SearchResult[]): string {
   return results
     .map((res, index) => {
       const { manual, section } = res;
+      const targetedData = query ? extractRelevantExcerpt(section.content, query, section.keyPoints) : '';
+
       return `### [REFERENCIA ${index + 1}]
 Manual: ${manual.title} (${manual.code}, v${manual.version})
 Departamento: ${manual.department}
 Artículo: ${section.articleNumber} - "${section.title}"
 Identificador: ${manual.id}#${section.id}
-${section.keyPoints && section.keyPoints.length > 0 ? `Puntos Clave del Artículo: ${section.keyPoints.join(' | ')}\n` : ''}Texto del Artículo (INSTRUCCIÓN ESTRICTA: Si este texto contiene mucha información o varios subtítulos, extrae ÚNICAMENTE el dato específico que pidió el usuario —como horarios, nombres, plazos o requisitos puntuales— y descarta todos los demás subtítulos y texto no consultado. NUNCA transcribas el documento completo):
+${targetedData ? `>>> DATO EXACTO DEL MANUAL QUE RESPONDE LA PREGUNTA DEL USUARIO <<<\n"${targetedData}"\n` : ''}Texto de Referencia del Artículo:
 ${section.content}
 ---`;
     })
@@ -344,6 +346,45 @@ export function extractRelevantExcerpt(
   let targetText = content;
   let targetHeading: string | undefined = undefined;
 
+  // Helper to strip unrelated secondary clauses (e.g. log reporting, secondary obligations)
+  const refineClause = (text: string): string => {
+    const clauseDelimiters = /\s*(?:,\s*(?:y\s+|adem[aá]s\s+|asimismo\s+|mientras que\s+|reportando\b|registrando\b|dejando\b|notificando\b|debiendo\b|indicando\b|anotando\b)|;\s*)/i;
+    if (!clauseDelimiters.test(text)) return text;
+
+    const clauses = text.split(clauseDelimiters).map(c => c.trim()).filter(c => c.length > 5);
+    if (clauses.length <= 1) return text;
+
+    let bestClause = text;
+    let bestScore = -1;
+
+    for (const cl of clauses) {
+      const norm = normalizeText(cl);
+      let score = 0;
+      for (const kw of keywords) {
+        if (norm.includes(kw)) score += 10;
+      }
+      if (entityType === 'schedule' && /\b(\d{1,2}:\d{2}|\d+\s*(am|pm|hrs|horas|minutos|min)|turno|horario|cada\s+\d+)\b/i.test(norm)) {
+        score += 25;
+      }
+      if (entityType === 'person' && /\b(responsable|encargad|jefe|coordinador|oficial|contacto|correo|email)\b/i.test(norm)) {
+        score += 25;
+      }
+      if (entityType === 'amount' && /\b(\d+|plazo|anticipacion|dias|monto|\$)\b/i.test(norm)) {
+        score += 25;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestClause = cl;
+      }
+    }
+
+    if (bestScore >= 10 && bestClause.length < text.length * 0.9) {
+      return bestClause.endsWith('.') ? bestClause : bestClause + '.';
+    }
+    return text;
+  };
+
   if (blocks.length > 1) {
     // Score blocks based on heading relevance and content relevance
     let bestBlockScore = -1;
@@ -431,12 +472,13 @@ export function extractRelevantExcerpt(
     scoredSentences.sort((a, b) => b.score - a.score);
     const top = scoredSentences[0];
 
-    // If we have a high-confidence entity sentence, return it directly!
-    if (top.score >= 20 || entityType !== 'general') {
-      let result = top.sentence;
+    // If we have a high-confidence entity sentence, refine down to its exact clause and return!
+    if (top.score >= 15 || entityType !== 'general') {
+      let result = refineClause(top.sentence);
+      
       // If there is an immediate complementary sentence that adds critical clarification (e.g. Saturdays, email, details)
       const topIdx = sentences.indexOf(top.sentence);
-      if (topIdx !== -1 && topIdx + 1 < sentences.length) {
+      if (topIdx !== -1 && topIdx + 1 < sentences.length && entityType === 'general') {
         const next = sentences[topIdx + 1];
         if (next.length < 120 && (
           /^(los|las|el|en|anexo|correo|telefono|contacto|nota|importante)\b/i.test(next.trim()) ||
