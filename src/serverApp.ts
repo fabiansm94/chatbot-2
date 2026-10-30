@@ -1,3 +1,9 @@
+import dns from 'dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  // Ignore if unsupported
+}
 import express, { Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -140,7 +146,7 @@ app.get('/api/status', (req: Request, res: Response) => {
   res.json({
     status: 'online',
     hasGeminiKey: !!(apiKey && apiKey !== 'MY_GEMINI_API_KEY'),
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     defaultManualsCount: DEFAULT_MANUALS.length,
     timestamp: new Date().toISOString()
   });
@@ -246,33 +252,49 @@ ${contextMarkdown}
           parts: [{ text: message }]
         });
 
-        // Call Gemini with friendly temperature and factual grounding
-        const geminiPromise = aiClient.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: formattedContents,
-          config: {
-            systemInstruction,
-            temperature: 0.35, // Balanced for friendly coworker conversation while maintaining concise precision
+        // Try models in order of responsiveness: gemini-3.5-flash, gemini-3.1-flash-lite, gemini-3.8-flash
+        const candidateModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+        let generatedText = '';
+        let usedModel = '';
+
+        for (const candidateModel of candidateModels) {
+          try {
+            const geminiPromise = aiClient.models.generateContent({
+              model: candidateModel,
+              contents: formattedContents,
+              config: {
+                systemInstruction,
+                temperature: 0.35, // Balanced for friendly coworker conversation while maintaining concise precision
+              }
+            });
+
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error(`Timeout with model ${candidateModel}`)), 5500)
+            );
+
+            const response: any = await Promise.race([geminiPromise, timeoutPromise]);
+            const rawText = response.text || '';
+            if (rawText && rawText.trim().length > 0) {
+              generatedText = cleanRawHtmlTags(rawText);
+              usedModel = candidateModel;
+              break;
+            }
+          } catch (modelErr: any) {
+            console.warn(`[ManualBot Server] Model ${candidateModel} failed or timed out (${modelErr?.message || modelErr}), trying fallback...`);
           }
-        });
+        }
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Gemini API request timed out')), 14000)
-        );
-
-        const response: any = await Promise.race([geminiPromise, timeoutPromise]);
-        const rawGeneratedText = response.text || '';
-        const generatedText = cleanRawHtmlTags(rawGeneratedText);
-
-        res.json({
-          text: generatedText,
-          citations,
-          engine: 'gemini-3.8-flash',
-          grounded: searchResults.length > 0
-        });
-        return;
+        if (generatedText) {
+          res.json({
+            text: generatedText,
+            citations,
+            engine: usedModel,
+            grounded: searchResults.length > 0
+          });
+          return;
+        }
       } catch (geminiError: any) {
-        console.warn('[ManualBot Server] Gemini API error, falling back to local manual knowledge engine:', geminiError?.message || geminiError);
+        console.warn('[ManualBot Server] All Gemini models failed or timed out, falling back to local manual knowledge engine:', geminiError?.message || geminiError);
       }
     }
 

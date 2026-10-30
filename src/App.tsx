@@ -18,6 +18,7 @@ import { DEFAULT_PROPOSALS } from './data/defaultProposals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from './data/userChatThreads';
 import { ChatMessage, Citation, ManualDocument, ManualSection, KnowledgeProposal, UserChatThread } from './types/manual';
 import { approveProposal, rejectProposal } from './utils/approvalWorkflow';
+import { searchManuals, generateLocalGroundedAnswer } from './utils/manualSearch';
 
 export default function App() {
   const isWidgetMode = typeof window !== 'undefined' && window.location.search.includes('mode=widget');
@@ -257,16 +258,24 @@ export default function App() {
         setDoc(doc(db, 'chats', finalUserThread.userId), finalUserThread).catch(console.warn);
       }
     } catch (error: any) {
-      console.error('Error sending message:', error);
-      const errorMsg: ChatMessage = {
+      console.warn('Communication issue with server, answering with local manual engine:', error);
+      const searchResults = searchManuals(text, manuals, 4);
+      const localResult = generateLocalGroundedAnswer(text, searchResults, 'direct');
+      const fallbackMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: 'Hubo un inconveniente temporal de comunicación. He recurrido a la base interna local de manuales. Por favor intenta reformular tu pregunta.',
-        timestamp: Date.now(),
-        error: true
+        content: localResult.answer,
+        citations: localResult.citations,
+        grounded: searchResults.length > 0,
+        timestamp: Date.now()
       };
-      const finalThreads = appendUserMessage(updatedThreads, 'current-user', errorMsg);
+      const finalThreads = appendUserMessage(updatedThreads, 'current-user', fallbackMsg);
       setThreads(finalThreads);
+
+      const finalUserThread = finalThreads.find(t => t.isCurrentUser);
+      if (finalUserThread) {
+        setDoc(doc(db, 'chats', finalUserThread.userId), finalUserThread).catch(console.warn);
+      }
     } finally {
       setIsLoading(false);
     }

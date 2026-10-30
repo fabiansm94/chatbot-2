@@ -1,3 +1,9 @@
+import dns from 'dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  // Ignore if unsupported
+}
 import { createServer as createViteServer } from 'vite';
 import express, { Request, Response } from 'express';
 import path from 'path';
