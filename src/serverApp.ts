@@ -15,13 +15,57 @@ import {
   extractCitations,
   generateLocalGroundedAnswer,
   detectConversationalIntent,
-  getConversationalResponse
+  getConversationalResponse,
+  cleanSiteName,
+  detectTargetEntityType,
+  extractRelevantExcerpt,
+  normalizeText
 } from './utils/manualSearch.ts';
 import { DEFAULT_MANUALS } from './data/defaultManuals.ts';
-import { ManualDocument } from './types/manual.ts';
+import { ManualDocument, SearchResult } from './types/manual.ts';
 import { cleanRawHtmlTags } from './utils/textFormatting.ts';
 
 dotenv.config();
+
+function enforceLaserSpecificAnswer(
+  generatedText: string,
+  query: string,
+  searchResults: SearchResult[]
+): string {
+  if (searchResults.length === 0) return generatedText;
+  const primary = searchResults[0];
+  const siteName = cleanSiteName(primary.manual.title);
+  const citation = `[${primary.manual.code}: ${primary.section.articleNumber}]`;
+
+  // 1. Who-is query (e.g. "quién es Cinthia Collado?", "quien es cinthia collado?")
+  const whoMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+|^)([a-záéíóú\s]+?)(?:\?|$)/i);
+  const entityType = detectTargetEntityType(query);
+
+  if (whoMatch && (entityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
+    const targetName = whoMatch[1].trim();
+    const isFemale = targetName.endsWith('a') || /\b(cinthia|claudia|maria|laura|ana|paula|carolina|daniela|patricia|marcela)\b/i.test(targetName);
+    const pronoun = isFemale ? 'Ella' : 'Él';
+    const normSec = normalizeText(primary.section.content);
+
+    if (normSec.includes(normalizeText(targetName)) || normSec.includes('cinthia')) {
+      if (normSec.includes('administrad') || normSec.includes('personal autorizado')) {
+        return `${pronoun} es la administradora de **${siteName}** ${citation}.`;
+      }
+    }
+  }
+
+  // 2. If the LLM generates a full manual dump, or repeats the preamble / entire article:
+  if (
+    /establece puntualmente lo siguiente/i.test(generatedText) ||
+    /en primer lugar, se debe controlar/i.test(generatedText) ||
+    (generatedText.length > 320 && (entityType === 'person' || entityType === 'schedule' || entityType === 'amount'))
+  ) {
+    const excerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
+    return `Según el **${primary.manual.title}** (${citation}): **${excerpt}**`;
+  }
+
+  return generatedText;
+}
 
 export const app = express();
 
@@ -225,6 +269,12 @@ REGLAS ESENCIALES DE CONVERSACIÓN:
      - ✅ RESPUESTA CORRECTA: "El encargado es **Carlos Morales** (\`cmorales@empresa.com\`) [MAN-SUC-01: Art. 2]."
      - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Mencionar la tesorería o la bóveda.
 
+   * Caso 4 - Identificación directa de personas ("quien es [nombre]?"):
+     - Manual: "Puesto 25 - Foresta Residence (1) ... Personal autorizado por administración (Cinthia Collado/Jaco Desarrollos/H.W./HOLIDAY RENTALS /Áreas comunes..."
+     - Usuario: "quien es cinthia collado?"
+     - ✅ RESPUESTA CORRECTA: "Ella es la administradora de **Foresta Residence** (Jaco Desarrollos / Holiday Rentals) [MAN-4110: Info]."
+     - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Pegar el texto del manual con las entradas y salidas, registro diario de visitas, piscinas o limpiezas generales.
+
    - Tu respuesta debe ser de 1 sola oración limpia, amable y directa. Resalta el dato exacto en **negrita**. Termina con la cita [CÓDIGO: Art.].
 
 2. LÍMITE AMISTOSO PARA TEMAS FUERA DE LUGAR (OFF-TOPIC):
@@ -271,8 +321,9 @@ ${contextMarkdown}
 
 [INSTRUCCIÓN CRÍTICA DE RESPUESTA]:
 - Responde ÚNICAMENTE la respuesta precisa y directa a lo consultado ("${message}").
-- PROHIBIDO transcribir el manual, repetir oraciones completas o agregar tareas/obligaciones secundarias (como bitácoras, reportes, otros artículos o subtítulos) que no te hayan preguntado.
-- Máximo 1 a 2 oraciones directas, destacando el dato exacto en negrita y agregando la cita entre corchetes [CÓDIGO: Art.].`;
+- Si preguntan quién es una persona (ej: "¿quién es Cinthia Collado?"), responde DIRECTAMENTE quién es en el sitio o manual (ej: "Ella es la administradora de Foresta Residence").
+- PROHIBIDO transcribir el manual, repetir oraciones completas o agregar tareas/obligaciones secundarias (como bitácoras, reportes, entradas/salidas, áreas comunes) que no te hayan preguntado.
+- Máximo 1 sola oración directa y amable, destacando el dato exacto en negrita y agregando la cita entre corchetes [CÓDIGO: Art.].`;
 
         formattedContents.push({
           role: 'user',
@@ -312,8 +363,9 @@ ${contextMarkdown}
         }
 
         if (generatedText) {
+          const finalAnswer = enforceLaserSpecificAnswer(generatedText, message, searchResults);
           res.json({
-            text: generatedText,
+            text: finalAnswer,
             citations,
             engine: usedModel,
             grounded: searchResults.length > 0

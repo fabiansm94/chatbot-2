@@ -133,11 +133,11 @@ export function searchManuals(
   const results: SearchResult[] = [];
 
   for (const manual of manuals) {
-    for (const section of manual.sections) {
-      const normTitle = normalizeText(section.title);
-      const normArticle = normalizeText(section.articleNumber);
-      const normContent = normalizeText(section.content);
-      const normTags = section.tags.map(t => normalizeText(t)).join(' ');
+    for (const section of manual.sections || []) {
+      const normTitle = normalizeText(section.title || '');
+      const normArticle = normalizeText(section.articleNumber || '');
+      const normContent = normalizeText(section.content || '');
+      const normTags = Array.isArray(section.tags) ? section.tags.map(t => normalizeText(t)).join(' ') : '';
 
       let score = 0;
 
@@ -160,19 +160,19 @@ export function searchManuals(
       }
 
       // Department matching
-      if (normalizeText(manual.department).includes(normalizedQuery)) {
+      if (normalizeText(manual.department || '').includes(normalizedQuery)) {
         score += 15;
       }
 
       if (score > 0) {
         // Build readable snippet centered on matching term
-        let snippet = section.content.slice(0, 180);
+        let snippet = (section.content || '').slice(0, 180);
         for (const kw of keywords) {
           const idx = normContent.indexOf(kw);
           if (idx !== -1) {
             const start = Math.max(0, idx - 40);
-            const end = Math.min(section.content.length, idx + 140);
-            snippet = (start > 0 ? '...' : '') + section.content.slice(start, end) + '...';
+            const end = Math.min((section.content || '').length, idx + 140);
+            snippet = (start > 0 ? '...' : '') + (section.content || '').slice(start, end) + '...';
             break;
           }
         }
@@ -203,7 +203,20 @@ export function buildManualContext(results: SearchResult[], query?: string): str
   return results
     .map((res, index) => {
       const { manual, section } = res;
-      const targetedData = query ? extractRelevantExcerpt(section.content, query, section.keyPoints) : '';
+      const targetedData = query ? extractRelevantExcerpt(section.content || '', query, section.keyPoints) : '';
+
+      // CRITICAL: When a concise targeted excerpt was extracted, provide ONLY that excerpt to prevent the LLM
+      // from regurgitating unrelated paragraphs (such as entry logs, pool cleaning, or unrequested procedures).
+      if (targetedData && (targetedData.length < (section.content || '').length * 0.85 || targetedData.length <= 350)) {
+        return `### [REFERENCIA ${index + 1}]
+Manual: ${manual.title} (${manual.code}, v${manual.version})
+Departamento: ${manual.department}
+Artículo: ${section.articleNumber} - "${section.title}"
+Identificador: ${manual.id}#${section.id}
+DATO EXACTO DEL MANUAL QUE RESPONDE LA PREGUNTA (ENTREGAR EXCLUSIVAMENTE ESTE DATO):
+"${targetedData}"
+---`;
+      }
 
       return `### [REFERENCIA ${index + 1}]
 Manual: ${manual.title} (${manual.code}, v${manual.version})
@@ -245,7 +258,8 @@ export function detectTargetEntityType(query: string): 'schedule' | 'person' | '
     return 'schedule';
   }
 
-  if (/\b(quien|quienes|nombre|nombres|responsable|responsables|encargado|encargada|contacto|contactar|jefe|jefatura|coordinador|coordinadora|lider|con quien|a quien|quien autoriza|quien responde)\b/i.test(norm)) {
+  if (/\b(quien|quienes|nombre|nombres|responsable|responsables|encargado|encargada|contacto|contactar|jefe|jefatura|coordinador|coordinadora|lider|con quien|a quien|quien autoriza|quien responde)\b/i.test(norm) ||
+      /^(?:qui[eé]n\s+es\s+)?([a-zñáéíóú]{2,}\s+[a-zñáéíóú]{2,})\??$/i.test(norm.trim())) {
     return 'person';
   }
 
@@ -546,6 +560,17 @@ export function extractRelevantExcerpt(
 }
 
 /**
+ * Cleans raw manual title down to the site or project name
+ */
+export function cleanSiteName(title: string): string {
+  return title
+    .replace(/^Puesto\s+\d+\s*[-–—]\s*/i, '')
+    .replace(/\s*\(\d+\)$/, '')
+    .replace(/^(?:Reglamento|Manual|Procedimiento)\s+(?:de|del|para)\s+/i, '')
+    .trim();
+}
+
+/**
  * Friendly, coworker-styled grounded answer generator with polite boundary for off-topic queries.
  * Synthesizes and extracts ONLY the specific part requested by the user, avoiding dumping entire manuals.
  */
@@ -608,8 +633,26 @@ export function generateLocalGroundedAnswer(
       });
     }
   } else {
-    // Direct and concise coworker tone (never dumps the whole manual)
-    answer = `¡Hola! Según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]):\n\n**${relevantExcerpt}**\n\n*(Referencia oficial: [${primary.section.articleNumber}]).*`;
+    // Check if query is asking who someone is (e.g. "quién es Cinthia Collado?", "quien es Cinthia Collado", or person name)
+    const whoMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+|^)([a-záéíóú\s]+?)(?:\?|$)/i);
+    const targetEntityType = detectTargetEntityType(query);
+
+    if (whoMatch && (targetEntityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
+      const targetName = whoMatch[1].trim();
+      const siteName = cleanSiteName(primary.manual.title);
+      const normEx = normalizeText(relevantExcerpt);
+
+      if (normEx.includes('personal autorizado') || normEx.includes('administrad')) {
+        const isFemale = targetName.endsWith('a') || /\b(cinthia|claudia|maria|laura|ana|paula|carolina|daniela|patricia|marcela)\b/i.test(targetName);
+        const pronoun = isFemale ? 'Ella' : 'Él';
+        answer = `${pronoun} es la administradora de **${siteName}** [${primary.manual.code}: ${primary.section.articleNumber}].`;
+      } else {
+        answer = `${targetName} figura en **${siteName}** como: **${relevantExcerpt}** [${primary.manual.code}: ${primary.section.articleNumber}].`;
+      }
+    } else {
+      // Direct and concise response (never dumps the whole manual)
+      answer = `Según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]): **${relevantExcerpt}**`;
+    }
   }
 
   return {

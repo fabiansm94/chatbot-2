@@ -12,6 +12,7 @@ import {
   detectTargetEntityType
 } from './manualSearch';
 import { DEFAULT_MANUALS } from '../data/defaultManuals';
+import { ManualDocument } from '../types/manual';
 
 test('normalizeText cleans accents and symbols', () => {
   assert.equal(normalizeText('¡Hola! ¿Cómo estás?'), 'hola como estas');
@@ -229,5 +230,61 @@ test('extractRelevantExcerpt extracts ONLY the requested person from arrow-delim
   assert.ok(!extracted.includes('entradas y salidas'));
   assert.ok(!extracted.includes('diario de visitas'));
   assert.ok(!extracted.includes('mantenimiento de piscinas'));
+});
+
+test('generateLocalGroundedAnswer responds directly with Ella es la administradora de Foresta Residence', () => {
+  const forestaText = 'Foresta Residence / Puesto 25.0 / SI -01 En primer lugar, se debe controlar las entradas y salidas del puesto, así como llevar el registro de dichas entradas o salidas.o actuales como pendientes ➤ Al registr o diario de visitas, sus horas de ingreso y las visitas pendientes ➤ Personal autorizado por administración (Cinthia Collado/Jaco Desarrollos/H.W./HOLIDAY RENTALS /Áreas comunes (reciclar basura, fumigar, mantenimiento de piscinas, limpiezas generales, trab aios o';
+
+  const mockManual: ManualDocument = {
+    id: 'man-4110',
+    title: 'Puesto 25 - Foresta Residence (1)',
+    code: 'MAN-4110',
+    category: 'seguridad',
+    version: '1.0',
+    updatedDate: '2026-10-30',
+    department: 'Seguridad',
+    iconName: 'ShieldCheck',
+    summary: 'Manual puesto 25',
+    sections: [
+      {
+        id: 'sec-info',
+        articleNumber: 'Info',
+        title: 'Info General',
+        tags: ['foresta', 'cinthia', 'collado'],
+        content: forestaText
+      }
+    ]
+  };
+
+  const results = searchManuals('quien es cinthia collado?', [mockManual]);
+  const { answer } = generateLocalGroundedAnswer('quien es cinthia collado?', results, 'direct');
+
+  assert.strictEqual(answer, 'Ella es la administradora de **Foresta Residence** [MAN-4110: Info].');
+  assert.ok(!answer.includes('entradas y salidas'));
+  assert.ok(!answer.includes('diario de visitas'));
+  assert.ok(!answer.includes('piscinas'));
+});
+
+test('searchManuals does not crash when manual sections lack tags property', () => {
+  const manualWithoutTags: any = {
+    id: 'man-untagged',
+    title: 'Manual Sin Etiquetas',
+    code: 'MAN-UNT',
+    category: 'operaciones',
+    version: '1.0',
+    sections: [
+      {
+        id: 'sec-1',
+        articleNumber: 'Art. 1',
+        title: 'Horario',
+        content: 'El horario de atención es de 09:00 a 18:00 hrs.'
+        // Note: tags is undefined
+      }
+    ]
+  };
+
+  const results = searchManuals('horario de atencion', [manualWithoutTags]);
+  assert.strictEqual(results.length, 1);
+  assert.strictEqual(results[0].section.articleNumber, 'Art. 1');
 });
 
