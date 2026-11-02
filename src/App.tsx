@@ -17,13 +17,19 @@ import { DEFAULT_MANUALS } from './data/defaultManuals';
 import { DEFAULT_PROPOSALS } from './data/defaultProposals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from './data/userChatThreads';
 import { ChatMessage, Citation, ManualDocument, ManualSection, KnowledgeProposal, UserChatThread } from './types/manual';
+import { Laptop, Smartphone } from 'lucide-react';
 import { approveProposal, rejectProposal } from './utils/approvalWorkflow';
 import { searchManuals, generateLocalGroundedAnswer } from './utils/manualSearch';
 
 export default function App() {
-  const isWidgetMode = typeof window !== 'undefined' && window.location.search.includes('mode=widget');
+  const isWidgetMode = typeof window !== 'undefined' && (
+    window.location.search.includes('mode=widget') ||
+    window.location.search.includes('embed') ||
+    window.self !== window.top
+  );
 
   const [activeTab, setActiveTab] = useState<'chat' | 'book' | 'explorer' | 'approvals' | 'embed' | 'settings'>('chat');
+  const [desktopChatMode, setDesktopChatMode] = useState<'web' | 'phone'>('web');
   const [manuals, setManuals] = useState<ManualDocument[]>(DEFAULT_MANUALS);
   const [proposals, setProposals] = useState<KnowledgeProposal[]>(DEFAULT_PROPOSALS);
   const [companyName, setCompanyName] = useState<string>('Global Corp & Partners');
@@ -434,7 +440,7 @@ export default function App() {
       {showLoginModal && <LoginModal onLogin={handleLogin} />}
 
       <div className="w-full max-w-7xl h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)] lg:h-[calc(100vh-3rem)] bg-[#262835] rounded-[24px] sm:rounded-[32px] shadow-2xl overflow-hidden flex border border-[#3e4153]">
-        {isFabian && (
+        {isAuthenticated && (
           <LeftRail
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -446,22 +452,66 @@ export default function App() {
 
         <main className="flex-1 flex overflow-hidden bg-[#262835] min-w-0 min-h-0 h-full">
           {activeTab === 'chat' && (
-            <ChatView
-              threads={threads}
-              activeThreadId={activeThreadId}
-              onSelectThread={setActiveThreadId}
-              isLoading={isLoading}
-              onSendMessage={handleSendMessage}
-              onClearChat={handleClearChat}
-              onOpenCitation={handleOpenCitation}
-              companyName={companyName}
-              hasGeminiKey={hasGeminiKey}
-              manuals={manuals}
-              onOpenProposeModal={() => setProposeModalOpen(true)}
-              onOpenSection={handleOpenSection}
-              loggedUserName={loggedUserName}
-              onLogout={handleLogout}
-            />
+            <div className="flex-1 flex flex-col h-full bg-[#1e202b] p-2 sm:p-4 overflow-hidden">
+              {/* Desktop Workspace Mode Bar (Allows testing Web & Phone/Embed without polluting the bot) */}
+              <div className="flex items-center justify-between px-3.5 py-2 mb-2.5 bg-[#262835] rounded-xl border border-[#3e4153]/80 shrink-0 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-semibold text-slate-300">Modo de prueba:</span>
+                  <div className="inline-flex items-center bg-[#1e202b] p-0.5 rounded-full border border-white/10 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setDesktopChatMode('web')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        desktopChatMode === 'web'
+                          ? 'bg-[#ca4048] text-white shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Laptop className="w-3.5 h-3.5" />
+                      <span>Versión Web</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDesktopChatMode('phone')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        desktopChatMode === 'phone'
+                          ? 'bg-[#ca4048] text-white shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Versión Embed</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-400 hidden sm:block">
+                  {desktopChatMode === 'web'
+                    ? '💻 Vista de escritorio completa'
+                    : '📱 Simulación idéntica al embed móvil / intranet'}
+                </div>
+              </div>
+
+              <div className={`flex-1 flex overflow-hidden min-h-0 ${desktopChatMode === 'phone' ? 'items-center justify-center' : ''}`}>
+                <ChatView
+                  threads={threads}
+                  activeThreadId={activeThreadId}
+                  onSelectThread={setActiveThreadId}
+                  isLoading={isLoading}
+                  onSendMessage={handleSendMessage}
+                  onClearChat={handleClearChat}
+                  onOpenCitation={handleOpenCitation}
+                  companyName={companyName}
+                  hasGeminiKey={hasGeminiKey}
+                  manuals={manuals}
+                  onOpenProposeModal={() => setProposeModalOpen(true)}
+                  onOpenSection={handleOpenSection}
+                  loggedUserName={loggedUserName}
+                  onLogout={handleLogout}
+                  viewMode={desktopChatMode}
+                  allowModeToggle={false}
+                />
+              </div>
+            </div>
           )}
 
           {isFabian && activeTab === 'book' && (

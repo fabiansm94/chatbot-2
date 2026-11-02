@@ -309,10 +309,10 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const pendingApprovalsCount = proposals.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="w-full h-screen max-h-screen bg-background text-foreground flex overflow-hidden font-sans">
+    <div className="w-full h-screen max-h-screen bg-[#fff8f8] text-slate-800 flex overflow-hidden font-sans">
       {showLoginModal && <LoginModal onLogin={handleLogin} />}
 
-      {isFabian && (
+      {isAuthenticated && (
         <LeftRail
           activeTab={activeTab as any}
           setActiveTab={setActiveTab as any}
@@ -322,24 +322,28 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
         />
       )}
       
-      <main className="flex-1 flex overflow-hidden bg-background w-full h-full">
+      <main className="flex-1 flex overflow-hidden bg-[#fff8f8] w-full h-full items-center justify-center p-0">
         {activeTab === 'chat' && (
-          <ChatView
-            threads={threads}
-            activeThreadId={activeThreadId}
-            onSelectThread={setActiveThreadId}
-            isLoading={isLoading}
-            onSendMessage={handleSendMessage}
-            onClearChat={handleClearChat}
-            onOpenCitation={handleOpenCitation}
-            companyName={companyName}
-            hasGeminiKey={hasGeminiKey}
-            manuals={manuals}
-            onOpenProposeModal={() => setProposeModalOpen(true)}
-            onOpenSection={handleOpenSection}
-            loggedUserName={loggedUserName}
-            onLogout={handleLogout}
-          />
+          <div className="w-full h-full flex flex-col bg-[#fff8f8]">
+            <ChatView
+              threads={threads}
+              activeThreadId={activeThreadId}
+              onSelectThread={setActiveThreadId}
+              isLoading={isLoading}
+              onSendMessage={handleSendMessage}
+              onClearChat={handleClearChat}
+              onOpenCitation={handleOpenCitation}
+              companyName={companyName}
+              hasGeminiKey={hasGeminiKey}
+              manuals={manuals}
+              onOpenProposeModal={() => setProposeModalOpen(true)}
+              onOpenSection={handleOpenSection}
+              loggedUserName={loggedUserName}
+              onLogout={handleLogout}
+              viewMode="phone"
+              allowModeToggle={false}
+            />
+          </div>
         )}
 
         {isFabian && activeTab === 'book' && (
