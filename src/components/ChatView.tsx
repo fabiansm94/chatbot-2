@@ -12,10 +12,6 @@ import {
   ShieldCheck,
   MoreVertical,
   LogOut,
-  Calendar,
-  Users,
-  Shield,
-  HelpCircle,
   Lock
 } from 'lucide-react';
 import { ChatMessage, Citation, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
@@ -38,35 +34,10 @@ interface ChatViewProps {
   loggedUserName?: string;
   onLogout?: () => void;
   viewMode?: 'web' | 'phone';
+  onChangeViewMode?: (mode: 'web' | 'phone') => void;
   allowModeToggle?: boolean;
+  isEmbed?: boolean;
 }
-
-const QUICK_ACTIONS = [
-  {
-    id: 'schedules',
-    icon: Calendar,
-    title: 'Horarios y Turnos',
-    query: '¿Cuáles son los horarios de atención y turnos del personal?'
-  },
-  {
-    id: 'personnel',
-    icon: Users,
-    title: 'Personal y Sedes',
-    query: '¿Quiénes están asignados en Foresta y Sunset?'
-  },
-  {
-    id: 'manuals',
-    icon: Shield,
-    title: 'Manuales Oficiales',
-    query: '¿Cuáles son los manuales y procedimientos principales de seguridad?'
-  },
-  {
-    id: 'question',
-    icon: HelpCircle,
-    title: 'Hacer Pregunta',
-    query: ''
-  }
-];
 
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -79,7 +50,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   loggedUserName,
   onLogout,
   viewMode = 'web',
-  allowModeToggle = true
+  onChangeViewMode,
+  isEmbed = false
 }) => {
   const [currentMode, setCurrentMode] = useState<'web' | 'phone'>(viewMode);
   const [inputText, setInputText] = useState('');
@@ -124,47 +96,35 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }));
   };
 
-  const handleQuickAction = (query: string) => {
-    if (query) {
-      onSendMessage(query);
-    } else {
-      inputRef.current?.focus();
-    }
-  };
-
-  const isEmbed =
-    !allowModeToggle ||
+  const isEmbedMode =
+    isEmbed ||
     (typeof window !== 'undefined' &&
       (window.location.search.includes('mode=widget') ||
-       window.location.search.includes('embed') ||
-       window.self !== window.top));
+       window.location.search.includes('embed=true')));
 
-  const isPhone = isEmbed || currentMode === 'phone';
+  const isPhone = isEmbedMode || currentMode === 'phone';
 
   return (
     <div
       className={`w-full h-full flex flex-col overflow-hidden transition-all duration-200 select-none ${
-        isPhone
-          ? isEmbed
-            ? 'w-full h-full bg-[#fff8f8]'
-            : 'max-w-[420px] mx-auto rounded-[32px] sm:rounded-[38px] shadow-2xl border border-rose-200/70 bg-[#fff8f8]'
-          : 'flex-1 rounded-[24px] shadow-xl border border-rose-200/50 bg-[#fff8f8]'
+        isEmbedMode
+          ? 'w-full h-full bg-[#fff8f8]'
+          : isPhone
+            ? 'max-w-[420px] mx-auto h-full shadow-2xl border-x border-rose-200/70 bg-[#fff8f8]'
+            : 'flex-1 w-full h-full bg-[#fff8f8]'
       }`}
     >
       {/* =========================================================================
           HEADER: Mascot, Title, User & Options (Clean layout matching reference)
           ========================================================================= */}
-      <div className={`bg-gradient-to-r from-[#d84451] via-[#c63542] to-[#ad242f] px-4 py-3 sm:px-6 sm:py-3.5 text-white flex items-center justify-between shadow-md shrink-0 relative z-20 ${isPhone && !isEmbed ? 'rounded-t-[32px] sm:rounded-t-[38px]' : ''}`}>
+      <div className="bg-gradient-to-r from-[#d84451] via-[#c63542] to-[#ad242f] px-4 py-3 sm:px-6 sm:py-3.5 text-white flex items-center justify-between shadow-md shrink-0 relative z-20">
         <div className="flex items-center gap-3 min-w-0">
           <RobotMascot size="md" />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <h2 className="text-base sm:text-lg font-extrabold tracking-tight text-white leading-tight">
-                Aizen
+                AI-zen
               </h2>
-              <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider shadow-2xs">
-                AI
-              </span>
             </div>
             <p className="text-[11px] text-white/90 font-medium truncate leading-tight mt-0.5">
               Asistente STS Security
@@ -177,7 +137,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 relative shrink-0">
-          {loggedUserName && (
+          {loggedUserName && !isEmbedMode && (
             <span className="text-[11px] bg-white/15 px-2.5 py-1 rounded-full font-bold text-white shadow-2xs capitalize hidden md:inline-block">
               {loggedUserName}
             </span>
@@ -197,11 +157,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
           {headerMenuOpen && (
             <div className="absolute top-full right-0 mt-2 z-50 w-64 bg-white rounded-2xl shadow-2xl border border-rose-100 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3.5 py-2 border-b border-rose-100 font-bold text-[#b82733] flex items-center justify-between">
-                <span>Opciones de Aizen</span>
+                <span>Opciones de AI-zen</span>
                 <span className="text-[10px] text-slate-400 font-normal">
-                  {isPhone ? 'Modo Embed' : 'Modo Web'}
+                  {isEmbedMode ? 'Chat Embed' : isPhone ? 'Vista Teléfono' : 'Vista Web'}
                 </span>
               </div>
+              {!isEmbedMode && onChangeViewMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = currentMode === 'web' ? 'phone' : 'web';
+                    setCurrentMode(next);
+                    onChangeViewMode(next);
+                    setHeaderMenuOpen(false);
+                  }}
+                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-slate-700 hover:text-[#b82733] flex items-center justify-between text-xs transition-colors border-b border-rose-50"
+                >
+                  <span>Cambiar a {currentMode === 'web' ? 'Vista Teléfono' : 'Vista Web'}</span>
+                  <span className="text-[10px] font-semibold text-[#b82733] bg-rose-50 px-2 py-0.5 rounded-full">
+                    {currentMode === 'web' ? '📱' : '💻'}
+                  </span>
+                </button>
+              )}
               {activeThread.messages.length > 0 && (
                 <button
                   type="button"
@@ -215,7 +192,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <span>Limpiar Chat</span>
                 </button>
               )}
-              {onLogout && (
+              {onLogout && !isEmbedMode && (
                 <button
                   type="button"
                   onClick={() => {
@@ -250,7 +227,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <RobotMascot size="sm" className="mt-1 shrink-0" />
             <div className="max-w-[85%] bg-white border border-rose-100/90 text-slate-800 rounded-2xl rounded-tl-xs p-3.5 shadow-xs text-xs sm:text-sm space-y-1">
               <h4 className="font-extrabold text-[#b82733] flex items-center gap-1">
-                <span>¡Hola! Soy Aizen</span>
+                <span>¡Hola! Soy AI-zen</span>
                 <span>👋</span>
               </h4>
               <p className="text-slate-600 leading-relaxed text-xs sm:text-sm">
@@ -259,30 +236,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <div className="text-[10px] text-slate-400 text-right pt-0.5">
                 10:30 AM
               </div>
-            </div>
-          </div>
-
-          {/* Quick Action Shortcuts Grid */}
-          <div className="bg-white border border-rose-100/90 rounded-2xl p-3 sm:p-4 shadow-xs">
-            <div className="grid grid-cols-4 gap-2 sm:gap-3">
-              {QUICK_ACTIONS.map(action => {
-                const IconComp = action.icon;
-                return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => handleQuickAction(action.query)}
-                    className="flex flex-col items-center group cursor-pointer focus:outline-none"
-                  >
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#d84451] to-[#ab2430] text-white flex items-center justify-center shadow-xs mb-1.5 group-hover:scale-105 group-hover:shadow-md transition-all">
-                      <IconComp className="w-5 h-5 stroke-[2]" />
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 group-hover:text-[#b82733] leading-tight text-center transition-colors">
-                      {action.title}
-                    </span>
-                  </button>
-                );
-              })}
             </div>
           </div>
 
@@ -352,7 +305,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                               <span>Verificado</span>
                             </span>
                           ) : (
-                            <span className="text-slate-400">Aizen</span>
+                            <span className="text-slate-400">AI-zen</span>
                           )}
                         </div>
                       ) : (
@@ -413,7 +366,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <RobotMascot size="sm" className="shrink-0 mb-1" />
               <div className="px-3.5 py-2.5 rounded-2xl rounded-tl-xs bg-white border border-rose-100/90 flex items-center gap-2 text-xs text-slate-700 shadow-xs">
                 <span className="w-2 h-2 rounded-full bg-[#d84451] animate-ping" />
-                <span className="font-medium">Aizen está buscando en los manuales...</span>
+                <span className="font-medium">AI-zen está buscando en los manuales...</span>
               </div>
             </div>
           )}
@@ -425,7 +378,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* =========================================================================
           BOTTOM INPUT BAR: Floating rounded pill & Send button
           ========================================================================= */}
-      <div className={`p-2.5 sm:p-3.5 bg-[#fff8f8] border-t border-rose-100/90 shrink-0 ${isPhone ? (isEmbed ? '' : 'rounded-b-[32px] sm:rounded-b-[38px]') : 'rounded-b-[24px]'}`}>
+      <div className="p-2.5 sm:p-3.5 bg-[#fff8f8] border-t border-rose-100/90 shrink-0">
         <div className={!isPhone ? 'max-w-3xl mx-auto' : ''}>
           <form onSubmit={handleSubmit} className="flex items-center gap-2">
             <div className="flex-1 flex items-center bg-white border border-rose-200/90 rounded-full pl-3.5 pr-2 py-1.5 shadow-sm focus-within:border-[#d84451] focus-within:ring-2 focus-within:ring-[#d84451]/20 transition-all">

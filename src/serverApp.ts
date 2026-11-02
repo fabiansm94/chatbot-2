@@ -118,9 +118,10 @@ app.get('/widget.js', (req: Request, res: Response) => {
 
   const script = document.currentScript;
   const appUrl = (script && script.getAttribute('data-app-url')) || window.location.origin;
-  const company = (script && script.getAttribute('data-company')) || 'Nuestra Empresa';
-  const color = (script && script.getAttribute('data-color')) || '#4f46e5';
+  const company = (script && script.getAttribute('data-company')) || 'STS Security';
+  const color = (script && script.getAttribute('data-color')) || '#d84451';
   const isLeft = (script && script.getAttribute('data-position')) === 'bottom-left';
+  const startClosed = (script && script.getAttribute('data-open')) === 'false';
 
   // Create launcher container
   const container = document.createElement('div');
@@ -131,54 +132,58 @@ app.get('/widget.js', (req: Request, res: Response) => {
   container.style.zIndex = '999999';
   container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
-  // Create iframe popup
+  // Create iframe popup (opens in Chat version by default)
+  let isOpen = !startClosed;
   const iframe = document.createElement('iframe');
   iframe.src = appUrl + '/?mode=widget&company=' + encodeURIComponent(company);
   iframe.style.position = 'fixed';
-  iframe.style.bottom = '85px';
+  iframe.style.bottom = '88px';
   iframe.style[isLeft ? 'left' : 'right'] = '20px';
-  iframe.style.width = '380px';
-  iframe.style.height = '580px';
+  iframe.style.width = '390px';
+  iframe.style.height = '600px';
   iframe.style.maxWidth = 'calc(100vw - 32px)';
   iframe.style.maxHeight = 'calc(100vh - 110px)';
-  iframe.style.border = '1px solid rgba(255, 255, 255, 0.15)';
-  iframe.style.borderRadius = '18px';
-  iframe.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.4)';
-  iframe.style.display = 'none';
+  iframe.style.border = '1px solid rgba(254, 205, 211, 0.7)';
+  iframe.style.borderRadius = '28px';
+  iframe.style.boxShadow = '0 20px 45px rgba(0, 0, 0, 0.35)';
+  iframe.style.display = isOpen ? 'block' : 'none';
   iframe.style.zIndex = '999999';
   iframe.style.transition = 'all 0.25s ease';
-  iframe.title = 'ManualBot - Asistente de Manuales Internos';
+  iframe.style.backgroundColor = '#fff8f8';
+  iframe.title = 'AI-zen - Asistente STS Security';
   iframe.allow = 'clipboard-write';
 
   // Create toggle button
   const button = document.createElement('button');
   button.type = 'button';
-  button.style.width = '56px';
-  button.style.height = '56px';
+  button.style.width = '58px';
+  button.style.height = '58px';
   button.style.borderRadius = '50%';
   button.style.backgroundColor = color;
   button.style.color = '#ffffff';
-  button.style.border = 'none';
+  button.style.border = '2px solid rgba(255, 255, 255, 0.85)';
   button.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.3)';
   button.style.cursor = 'pointer';
   button.style.display = 'flex';
   button.style.alignItems = 'center';
   button.style.justifyContent = 'center';
+  button.style.padding = '4px';
+  button.style.overflow = 'hidden';
   button.style.transition = 'transform 0.2s, box-shadow 0.2s';
-  button.setAttribute('aria-label', 'Abrir Asistente de Manuales Internos');
+  button.setAttribute('aria-label', 'Abrir AI-zen Chat');
 
-  button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  const avatarImgHtml = '<img src="' + appUrl + '/assets/aistudio/bot_avatar_custom.png" alt="AI-zen" style="width:100%;height:100%;object-fit:contain;transform:scale(1.2);" />';
+  const closeIconHtml = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+  button.innerHTML = isOpen ? closeIconHtml : avatarImgHtml;
 
   button.onmouseenter = function() { button.style.transform = 'scale(1.06)'; };
   button.onmouseleave = function() { button.style.transform = 'scale(1)'; };
 
-  let isOpen = false;
   button.onclick = function() {
     isOpen = !isOpen;
     iframe.style.display = isOpen ? 'block' : 'none';
-    button.innerHTML = isOpen
-      ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
-      : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+    button.innerHTML = isOpen ? closeIconHtml : avatarImgHtml;
   };
 
   container.appendChild(button);

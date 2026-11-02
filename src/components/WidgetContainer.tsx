@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bot } from 'lucide-react';
-import { ManualDocument, ManualSection, ChatMessage, Citation, UserChatThread, KnowledgeProposal } from '../types/manual';
-import { LeftRail } from './LeftRail';
+import { ManualDocument, ManualSection, ChatMessage, Citation, UserChatThread } from '../types/manual';
 import { ChatView } from './ChatView';
-import { ManualsBookView } from './ManualsBookView';
-import { ArticleExplorerView } from './ArticleExplorerView';
-import { SettingsView } from './SettingsView';
 import { ManualDrawer } from './ManualDrawer';
-import { AddManualModal } from './AddManualModal';
-import { ProposeKnowledgeModal } from './ProposeKnowledgeModal';
-import { LoginModal } from './LoginModal';
 import { DEFAULT_MANUALS } from '../data/defaultManuals';
-import { DEFAULT_PROPOSALS } from '../data/defaultProposals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from '../data/userChatThreads';
-import { approveProposal, rejectProposal } from '../utils/approvalWorkflow';
 import { searchManuals, generateLocalGroundedAnswer } from '../utils/manualSearch';
 
 interface WidgetContainerProps {
@@ -25,7 +15,6 @@ interface WidgetContainerProps {
 
 const STORAGE_KEY_MANUALS = 'manualbot_widget_company_manuals_v1';
 const STORAGE_KEY_COMPANY = 'manualbot_widget_company_name_v1';
-const STORAGE_KEY_PROPOSALS = 'manualbot_widget_proposals_v1';
 
 export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   companyName: initialCompanyName,
@@ -33,32 +22,34 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   hasGeminiKey
 }) => {
   const [manuals, setManuals] = useState<ManualDocument[]>(() => {
+    const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
+    if (initialManuals && initialManuals.length > 0) {
+      return initialManuals.filter(m => !deletedIds.includes(m.id));
+    }
     try {
       const saved = localStorage.getItem(STORAGE_KEY_MANUALS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return parsed.filter((m: ManualDocument) => !deletedIds.includes(m.id));
       }
     } catch (e) {}
-    const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
-    const filteredInitial = (initialManuals.length > 0 ? initialManuals : DEFAULT_MANUALS)
-      .filter(m => !deletedIds.includes(m.id));
-    return filteredInitial;
+    return DEFAULT_MANUALS.filter(m => !deletedIds.includes(m.id));
   });
 
-  const [proposals, setProposals] = useState<KnowledgeProposal[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PROPOSALS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return DEFAULT_PROPOSALS;
-  });
+  useEffect(() => {
+    if (initialManuals) {
+      const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
+      setManuals(initialManuals.filter(m => !deletedIds.includes(m.id)));
+    }
+  }, [initialManuals]);
 
-  const [companyName, setCompanyName] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEY_COMPANY) || initialCompanyName || 'Global Corp & Partners';
+  const [companyName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('company');
+      if (fromUrl) return fromUrl;
+    }
+    return localStorage.getItem(STORAGE_KEY_COMPANY) || initialCompanyName || 'STS Security';
   });
 
   const [threads, setThreads] = useState<UserChatThread[]>(() => {
@@ -73,89 +64,18 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   });
 
   const [activeThreadId, setActiveThreadId] = useState<string>('current-user');
-  const [activeTab, setActiveTab] = useState<'chat' | 'book' | 'explorer' | 'settings'>('chat');
   const [isLoading, setIsLoading] = useState(false);
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => localStorage.getItem('manualbot_widget_auth_v1') === 'true');
-  const [showLoginModal, setShowLoginModal] = useState<boolean>(!isAuthenticated);
-  const [station, setStation] = useState<'Estación 1' | 'Estación 2' | null>(null);
-  const [loggedUserName, setLoggedUserName] = useState<string>(() => {
-    return localStorage.getItem('manualbot_widget_logged_user_v1') || '';
-  });
-
-  const isFabian = loggedUserName.trim().toLowerCase() === 'fabian';
-
-  useEffect(() => {
-    const checkTime = () => {
-      const now = new Date();
-      const h = now.getHours();
-      if ((h === 6 || h === 14 || h === 22) && now.getMinutes() === 0) {
-        setIsAuthenticated(false);
-        setShowLoginModal(true);
-        localStorage.setItem('manualbot_widget_auth_v1', 'false');
-      }
-    };
-    const interval = setInterval(checkTime, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleLogin = (station: 'Estación 1' | 'Estación 2', userName: string) => {
-    setStation(station);
-    setIsAuthenticated(true);
-    setShowLoginModal(false);
-    setLoggedUserName(userName);
-    localStorage.setItem('manualbot_widget_logged_user_v1', userName);
-    localStorage.setItem('manualbot_widget_auth_v1', 'true');
-    const isFab = userName.trim().toLowerCase() === 'fabian';
-    if (!isFab) {
-      setActiveTab('chat');
-    }
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setShowLoginModal(true);
-    setLoggedUserName('');
-    localStorage.removeItem('manualbot_widget_logged_user_v1');
-    localStorage.setItem('manualbot_widget_auth_v1', 'false');
-  };
-
-  // Drawer & Modal state
+  // Drawer state for citations
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerManual, setDrawerManual] = useState<ManualDocument | null>(null);
   const [drawerSection, setDrawerSection] = useState<ManualSection | null>(null);
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [proposeModalOpen, setProposeModalOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
 
   useEffect(() => {
     try {
       localStorage.setItem('manualbot_widget_threads_v3', JSON.stringify(threads));
     } catch (e) {}
   }, [threads]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_MANUALS, JSON.stringify(manuals));
-    } catch (e) {}
-  }, [manuals]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify(proposals));
-    } catch (e) {}
-  }, [proposals]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_COMPANY, companyName);
-    } catch (e) {}
-  }, [companyName]);
 
   const handleSendMessage = async (text: string) => {
     setActiveThreadId('current-user');
@@ -247,138 +167,25 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     }
   };
 
-  const handleAskAboutSection = (section: ManualSection, manual: ManualDocument) => {
-    setActiveTab('chat');
-    setActiveThreadId('current-user');
-    handleSendMessage(`¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`);
-  };
-
-  const handleAskAboutManual = (manual: ManualDocument) => {
-    setActiveTab('chat');
-    setActiveThreadId('current-user');
-    handleSendMessage(`¿Cuáles son los temas, derechos y obligaciones principales que contempla el ${manual.title} (${manual.code})?`);
-  };
-
-  const handleAddManual = (newManual: ManualDocument) => {
-    setManuals(prev => [newManual, ...prev]);
-  };
-
-  const handleDeleteManual = (manualId: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento permanentemente?')) {
-      setManuals(prev => prev.filter(m => m.id !== manualId));
-      try {
-        const deletedIds = JSON.parse(localStorage.getItem('manualbot_deleted_manual_ids_v1') || '[]');
-        if (!deletedIds.includes(manualId)) {
-          deletedIds.push(manualId);
-          localStorage.setItem('manualbot_deleted_manual_ids_v1', JSON.stringify(deletedIds));
-        }
-      } catch (e) {}
-      showToast('Manual eliminado correctamente.');
-    }
-  };
-
-  const handleResetManuals = () => {
-    if (window.confirm('¿Deseas restablecer el Book a los Procedimientos estándar?')) {
-      setManuals(DEFAULT_MANUALS);
-      localStorage.removeItem(STORAGE_KEY_MANUALS);
-    }
-  };
-
-  const handleImportManuals = (imported: ManualDocument[]) => {
-    setManuals(imported);
-  };
-
-  const handleSubmitProposal = (newProp: KnowledgeProposal) => {
-    setProposals(prev => [newProp, ...prev]);
-    showToast('¡Propuesta enviada con éxito!');
-  };
-
-  const handleApproveProposal = (prop: KnowledgeProposal, approverName: string) => {
-    const { updatedManuals, approvedProposal } = approveProposal(prop, manuals, approverName);
-    setManuals(updatedManuals);
-    setProposals(prev => prev.map(p => (p.id === prop.id ? approvedProposal : p)));
-    showToast(`¡Aprobado! El procedimiento "${prop.title}" ha sido incorporado.`);
-  };
-
-  const handleRejectProposal = (prop: KnowledgeProposal, reason: string, approverName: string) => {
-    const rejected = rejectProposal(prop, reason, approverName);
-    setProposals(prev => prev.map(p => (p.id === prop.id ? rejected : p)));
-    showToast(`Procedimiento rechazado.`);
-  };
-
-  const pendingApprovalsCount = proposals.filter(p => p.status === 'pending').length;
-
   return (
-    <div className="w-full h-screen max-h-screen bg-[#fff8f8] text-slate-800 flex overflow-hidden font-sans">
-      {showLoginModal && <LoginModal onLogin={handleLogin} />}
-
-      {isAuthenticated && (
-        <LeftRail
-          activeTab={activeTab as any}
-          setActiveTab={setActiveTab as any}
-          pendingApprovalsCount={pendingApprovalsCount}
-          totalManuals={manuals.length}
-          loggedUserName={loggedUserName}
+    <div className="w-full h-full bg-[#fff8f8] text-slate-800 flex flex-col overflow-hidden font-sans">
+      <main className="flex-1 flex flex-col overflow-hidden bg-[#fff8f8] w-full h-full">
+        <ChatView
+          threads={threads}
+          activeThreadId={activeThreadId}
+          onSelectThread={setActiveThreadId}
+          isLoading={isLoading}
+          onSendMessage={handleSendMessage}
+          onClearChat={handleClearChat}
+          onOpenCitation={handleOpenCitation}
+          companyName={companyName}
+          hasGeminiKey={hasGeminiKey}
+          manuals={manuals}
+          onOpenSection={handleOpenSection}
+          viewMode="phone"
+          allowModeToggle={false}
+          isEmbed={true}
         />
-      )}
-      
-      <main className="flex-1 flex overflow-hidden bg-[#fff8f8] w-full h-full items-center justify-center p-0">
-        {activeTab === 'chat' && (
-          <div className="w-full h-full flex flex-col bg-[#fff8f8]">
-            <ChatView
-              threads={threads}
-              activeThreadId={activeThreadId}
-              onSelectThread={setActiveThreadId}
-              isLoading={isLoading}
-              onSendMessage={handleSendMessage}
-              onClearChat={handleClearChat}
-              onOpenCitation={handleOpenCitation}
-              companyName={companyName}
-              hasGeminiKey={hasGeminiKey}
-              manuals={manuals}
-              onOpenProposeModal={() => setProposeModalOpen(true)}
-              onOpenSection={handleOpenSection}
-              loggedUserName={loggedUserName}
-              onLogout={handleLogout}
-              viewMode="phone"
-              allowModeToggle={false}
-            />
-          </div>
-        )}
-
-        {isFabian && activeTab === 'book' && (
-          <ManualsBookView
-            manuals={manuals}
-            onOpenSection={handleOpenSection}
-            onOpenAddModal={() => setAddModalOpen(true)}
-            onResetManuals={handleResetManuals}
-            onAskAboutManual={handleAskAboutManual}
-            onDeleteManual={handleDeleteManual}
-          />
-        )}
-
-        {isFabian && activeTab === 'explorer' && (
-          <ArticleExplorerView
-            manuals={manuals}
-            onOpenSection={handleOpenSection}
-            onAskAboutSection={handleAskAboutSection}
-          />
-        )}
-
-        {isFabian && activeTab === 'settings' && (
-          <SettingsView
-            companyName={companyName}
-            setCompanyName={setCompanyName}
-            manuals={manuals}
-            onImportManuals={handleImportManuals}
-            onResetManuals={handleResetManuals}
-            hasGeminiKey={hasGeminiKey}
-            proposals={proposals}
-            onApproveProposal={handleApproveProposal}
-            onRejectProposal={handleRejectProposal}
-            onOpenProposeModal={() => setProposeModalOpen(true)}
-          />
-        )}
       </main>
 
       <ManualDrawer
@@ -388,30 +195,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
         section={drawerSection}
         onAskAboutSection={(section, manual) => {
           setDrawerOpen(false);
-          setActiveTab('chat');
           handleSendMessage(`¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`);
         }}
       />
-
-      <AddManualModal
-        isOpen={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        onAddManual={handleAddManual}
-      />
-
-      <ProposeKnowledgeModal
-        isOpen={proposeModalOpen}
-        onClose={() => setProposeModalOpen(false)}
-        onSubmitProposal={handleSubmitProposal}
-        manuals={manuals}
-      />
-
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-card text-foreground border border-border shadow-medium text-xs flex items-center gap-2 animate-fade-in font-medium">
-          <span className="w-2 h-2 rounded-full bg-success" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
     </div>
   );
 };

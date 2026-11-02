@@ -14,13 +14,13 @@ export function generateIframeSnippet(baseUrl: string, options: Partial<WidgetEm
 
   const fullUrl = `${cleanUrl}/?${params.toString()}`;
 
-  return `<!-- ManualBot: Asistente de Procedimientos Internos (iFrame) -->
+  return `<!-- AI-zen: Chat Embebido en Versión Chat Directa (iFrame) -->
 <iframe
   src="${fullUrl}"
   width="100%"
-  height="650"
-  style="border: 1px solid #1e293b; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);"
-  title="Asistente de Manuales y Procedimientos"
+  height="640"
+  style="width: 100%; max-width: 420px; height: 640px; border: 1px solid #fecdd3; border-radius: 28px; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25); display: block; margin: 0 auto;"
+  title="AI-zen - Asistente STS Security"
   allow="clipboard-write"
 ></iframe>`;
 }
@@ -28,10 +28,10 @@ export function generateIframeSnippet(baseUrl: string, options: Partial<WidgetEm
 export function generateWidgetScriptSnippet(baseUrl: string, options: Partial<WidgetEmbedOptions> = {}): string {
   const cleanUrl = baseUrl.replace(/\/+$/, '');
   const company = options.companyName || 'Nuestra Empresa';
-  const color = options.themeColor || '#4f46e5';
+  const color = options.themeColor || '#d84451';
   const position = options.position || 'bottom-right';
 
-  return `<!-- ManualBot: Burbuja Flotante de Chat para Intranet o Sitio Web -->
+  return `<!-- AI-zen: Widget de Chat para Intranet o Sitio Web -->
 <script
   src="${cleanUrl}/widget.js"
   data-app-url="${cleanUrl}"

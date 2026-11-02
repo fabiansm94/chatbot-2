@@ -51,7 +51,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
                 ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
                 : 'text-white/80 hover:text-white hover:bg-white/15'
             }`}
-            title="Chat con Aizen"
+            title="Chat con AI-zen"
             aria-label="Abrir Chat"
           >
             <MessageCircle className="w-5 h-5 stroke-[2.2]" />

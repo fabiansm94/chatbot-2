@@ -26,13 +26,13 @@ export const USER_PROFILE: AvatarProfile = {
 
 export const BOT_PROFILE: AvatarProfile = {
   id: 'aizen',
-  name: 'Aizen',
+  name: 'AI-zen',
   department: 'Asistente IA',
   role: 'Compañero Oficial',
   color: '#ff6b6b',
   bgGradient: 'from-[#ff7a6e] to-[#fa5252]',
   initials: 'AZ',
-  avatarUrl: '/assets/aistudio/Minimal_White_Mascot_Face_Icon_40e4f488.png'
+  avatarUrl: '/assets/aistudio/bot_avatar_custom.png'
 };
 
 export const DEPARTMENT_PROFILES: Record<string, AvatarProfile> = {
