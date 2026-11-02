@@ -68,13 +68,6 @@ const QUICK_ACTIONS = [
   }
 ];
 
-const SUGGESTION_PILLS = [
-  'Foresta Residence',
-  'Sunset',
-  'Cinthia Collado',
-  'Patrullaje Cámaras',
-  'Alarmas de Intrusión'
-];
 
 export const ChatView: React.FC<ChatViewProps> = ({
   threads,
@@ -426,24 +419,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
           )}
 
           <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* =========================================================================
-          SUGGESTION PILLS: Quick tap queries
-          ========================================================================= */}
-      <div className="px-3 sm:px-6 pt-2 pb-1 bg-[#fff8f8] shrink-0 border-t border-rose-100/60">
-        <div className={`flex items-center gap-1.5 overflow-x-auto scrollbar-none ${!isPhone ? 'max-w-3xl mx-auto' : ''}`}>
-          {SUGGESTION_PILLS.map((pill, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSendMessage(pill)}
-              className="shrink-0 px-3 py-1 rounded-full bg-white hover:bg-rose-50 text-[#b82733] border border-rose-200/80 text-[11px] font-semibold transition-all shadow-2xs hover:border-[#b82733] active:scale-95"
-            >
-              {pill}
-            </button>
-          ))}
         </div>
       </div>
 
