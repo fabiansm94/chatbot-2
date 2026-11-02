@@ -288,3 +288,71 @@ test('searchManuals does not crash when manual sections lack tags property', () 
   assert.strictEqual(results[0].section.articleNumber, 'Art. 1');
 });
 
+test('multi-site query returns ONLY the requested site and never other sites', () => {
+  const multiSiteDoc = 'Hay 3 Alexander: Alexander - Mantenimiento Foresta Alexander - Mantenimiento Sunset Alexander - Tecnico Sunset Luego estan: Farida - Liempeza Sunset Heidi - Limpieza Foresta';
+
+  const mockManual: ManualDocument = {
+    id: 'man-sites',
+    title: 'Asignación de Puestos y Sedes',
+    code: 'MAN-PUESTOS',
+    category: 'operaciones',
+    version: '1.0',
+    updatedDate: '2026-11-02',
+    department: 'Operaciones',
+    iconName: 'ShieldCheck',
+    summary: 'Personal por sede',
+    sections: [
+      {
+        id: 'sec-puestos',
+        articleNumber: 'Art. 1',
+        title: 'Personal Asignado por Sede',
+        tags: ['foresta', 'sunset', 'alexander', 'farida', 'heidi'],
+        content: multiSiteDoc
+      }
+    ]
+  };
+
+  // 1. Query only Foresta
+  const resultsForesta = searchManuals('Foresta', [mockManual]);
+  const answerForesta = generateLocalGroundedAnswer('Foresta', resultsForesta, 'direct');
+  assert.ok(answerForesta.answer.includes('Foresta'));
+  assert.ok(answerForesta.answer.includes('Alexander'));
+  assert.ok(answerForesta.answer.includes('Heidi'));
+  assert.ok(!answerForesta.answer.includes('Sunset'), 'Must not include Sunset when querying Foresta');
+  assert.ok(!answerForesta.answer.includes('Farida'), 'Must not include Farida when querying Foresta');
+
+  // 2. Query only Sunset
+  const resultsSunset = searchManuals('Sunset', [mockManual]);
+  const answerSunset = generateLocalGroundedAnswer('Sunset', resultsSunset, 'direct');
+  assert.ok(answerSunset.answer.includes('Sunset'));
+  assert.ok(answerSunset.answer.includes('Alexander'));
+  assert.ok(answerSunset.answer.includes('Farida'));
+  assert.ok(!answerSunset.answer.includes('Foresta'), 'Must not include Foresta when querying Sunset');
+  assert.ok(!answerSunset.answer.includes('Heidi'), 'Must not include Heidi when querying Sunset');
+
+  // 3. Query specific person at site: Alexander de Foresta
+  const resultsAlexForesta = searchManuals('Alexander de Foresta', [mockManual]);
+  const answerAlexForesta = generateLocalGroundedAnswer('Alexander de Foresta', resultsAlexForesta, 'direct');
+  assert.ok(answerAlexForesta.answer.includes('Foresta'));
+  assert.ok(answerAlexForesta.answer.includes('Alexander'));
+  assert.ok(answerAlexForesta.answer.includes('Mantenimiento'));
+  assert.ok(!answerAlexForesta.answer.includes('Sunset'));
+  // 4. Query Alexander de Sunset
+  const resultsAlexSunset = searchManuals('Alexander de Sunset', [mockManual]);
+  const answerAlexSunset = generateLocalGroundedAnswer('Alexander de Sunset', resultsAlexSunset, 'direct');
+  assert.ok(answerAlexSunset.answer.includes('Sunset'));
+  assert.ok(answerAlexSunset.answer.includes('Alexander'));
+  assert.ok(answerAlexSunset.answer.includes('Mantenimiento'));
+  assert.ok(answerAlexSunset.answer.includes('Tecnico'));
+  assert.ok(!answerAlexSunset.answer.includes('Foresta'));
+  assert.ok(!answerAlexSunset.answer.includes('Heidi'));
+
+  // 5. Query quien es Heidi
+  const resultsHeidi = searchManuals('quien es Heidi', [mockManual]);
+  const answerHeidi = generateLocalGroundedAnswer('quien es Heidi', resultsHeidi, 'direct');
+  assert.ok(answerHeidi.answer.includes('Heidi'));
+  assert.ok(answerHeidi.answer.includes('Limpieza') || answerHeidi.answer.includes('Foresta'));
+  assert.ok(!answerHeidi.answer.includes('Sunset'));
+  assert.ok(!answerHeidi.answer.includes('Farida'));
+});
+

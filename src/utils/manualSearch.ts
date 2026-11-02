@@ -147,7 +147,8 @@ export function searchManuals(
       }
 
       // Exact article number match (e.g. "Art. 4.1" or "4.1")
-      if (normArticle.includes(normalizedQuery) || normalizedQuery.includes(normArticle)) {
+      const isArticleCode = /^(?:art|artículo|articulo|secc|cap|\d+)/i.test(normArticle);
+      if (normArticle === normalizedQuery || (isArticleCode && (normArticle.includes(normalizedQuery) || normalizedQuery.includes(normArticle)))) {
         score += 100;
       }
 
@@ -319,6 +320,124 @@ function splitIntoSubtitleBlocks(content: string): SubtitleBlock[] {
 }
 
 /**
+ * Parses individual personnel/task entries from continuous or structured document text.
+ * E.g.: "Hay 3 Alexander: Alexander - Mantenimiento Foresta Alexander - Mantenimiento Sunset Alexander - Tecnico Sunset Luego estan: Farida - Liempeza Sunset Heidi - Limpieza Foresta"
+ */
+export function parseRosterEntries(text: string): string[] {
+  if (!text) return [];
+
+  // Normalize intro clauses with colons and punctuation symbols
+  const normalized = text
+    .replace(/\b(?:Hay\s+\d+\s+[A-Za-z]+|Luego\s+est[aá]n|Adem[aá]s|Tambi[eé]n)\s*[:]/gi, '\n')
+    .replace(/[•●○▪▫■□➤►▸➜➔➡√✓]/g, '\n')
+    .replace(/\s*\/\s*(?=[A-ZÁÉÍÓÚ])/g, '\n');
+
+  const rawLines = normalized.split(/[\n\r;]+/).map(l => l.trim()).filter(Boolean);
+  const entries: string[] = [];
+
+  for (const line of rawLines) {
+    const parts = line.split(/\s*[-–—]\s*/);
+    if (parts.length > 2) {
+      // Multiple hyphens on one line packed together
+      let currentName = parts[0].trim().split(/\s+/).slice(-1)[0] || '';
+      for (let i = 1; i < parts.length; i++) {
+        const part = parts[i];
+        if (i === parts.length - 1) {
+          entries.push(`${currentName} - ${part.trim()}`);
+        } else {
+          const words = part.trim().split(/\s+/);
+          let splitIdx = words.length - 1;
+          if (splitIdx > 1 && /^(?:luego|ademas|tambien)$/i.test(words[splitIdx - 2])) {
+            splitIdx = splitIdx - 2;
+          } else if (splitIdx > 0 && /^(?:estan|estan:|hay)$/i.test(words[splitIdx - 1])) {
+            splitIdx = splitIdx - 1;
+          }
+          const roleAndSite = words.slice(0, splitIdx).join(' ').replace(/\s*(?:luego|ademas|tambien)?\s*(?:estan|hay)?[:\s]*$/i, '');
+          const nextName = words.slice(splitIdx).join(' ').replace(/.*:\s*/, '');
+          entries.push(`${currentName} - ${roleAndSite.trim()}`);
+          currentName = nextName.trim();
+        }
+      }
+    } else if (line.includes('-') || line.includes('–') || line.includes('—')) {
+      const trimmed = line.replace(/^[-\s*•]+/, '').trim();
+      if (trimmed.length < 150 && /^[A-ZÁÉÍÓÚ][a-zñáéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-zñáéíóú]+)*\s*[-–—]\s*.+/i.test(trimmed)) {
+        entries.push(trimmed);
+      }
+    }
+  }
+
+  return entries.filter(e => e.length > 3 && !/^(?:Hay\s+\d+|Luego\s+est[aá]n|Personal\s*:?)/i.test(e));
+}
+
+/**
+ * Filters roster entries by target site, person, and role from the query.
+ * Guarantees that if a specific site is requested (e.g. Foresta), entries from other sites (e.g. Sunset) are excluded.
+ */
+export function filterRosterEntriesByQuery(entries: string[], query: string): string[] {
+  if (entries.length === 0) return [];
+  const normQ = normalizeText(query);
+  const qWords = normQ.split(/\s+/).filter(w => w.length > 2);
+
+  // Extract candidate sites from roster entries
+  const candidateSites = new Set<string>();
+  for (const entry of entries) {
+    const words = normalizeText(entry).split(/\s+/);
+    if (words.length >= 2) {
+      candidateSites.add(words[words.length - 1]);
+      if (words.length >= 3) {
+        candidateSites.add(words[words.length - 2] + ' ' + words[words.length - 1]);
+      }
+    }
+  }
+
+  const matchedSites = Array.from(candidateSites).filter(site => 
+    site.length >= 3 && normQ.includes(site)
+  );
+
+  let filtered = entries;
+  let targetSite = '';
+
+  if (matchedSites.length > 0) {
+    matchedSites.sort((a, b) => b.length - a.length);
+    targetSite = matchedSites[0];
+    filtered = entries.filter(e => normalizeText(e).includes(targetSite));
+  }
+
+  // Filter out site words and generic filler words
+  const nonSiteWords = qWords.filter(w => 
+    !targetSite.includes(w) && 
+    !['personal', 'quien', 'quienes', 'estan', 'esta', 'para', 'del', 'los', 'las', 'solo', 'sitio', 'sobre', 'dame', 'muestra', 'muestrame'].includes(w)
+  );
+
+  if (nonSiteWords.length > 0) {
+    // 1. Check if person name is queried
+    const personMatch = filtered.filter(e => {
+      const entryName = normalizeText(e.split(/[-–—:]/)[0] || '');
+      return nonSiteWords.some(w => entryName.includes(w));
+    });
+
+    if (personMatch.length > 0) {
+      return personMatch;
+    }
+
+    // 2. Check if role is queried (e.g., mantenimiento, limpieza, tecnico)
+    const roleMatch = filtered.filter(e => {
+      const normE = normalizeText(e);
+      return nonSiteWords.some(w => 
+        (w.length >= 4 && normE.includes(w)) || 
+        (w.startsWith('limp') && (normE.includes('limp') || normE.includes('liemp')))
+      );
+    });
+
+    if (roleMatch.length > 0) {
+      return roleMatch;
+    }
+  }
+
+  return filtered;
+}
+
+/**
  * Extracts only the specific, relevant data point (schedule, name, amount, or concise sentence)
  * answering the user's query, filtering out unrelated subtitles and preventing full manual dumps.
  */
@@ -328,6 +447,16 @@ export function extractRelevantExcerpt(
   keyPoints?: string[]
 ): string {
   if (!content) return '';
+
+  // 0. Site-specific roster extraction:
+  // If the document contains multiple person-role entries across different sites (e.g. Foresta vs Sunset)
+  const rosterEntries = parseRosterEntries(content);
+  if (rosterEntries.length >= 2) {
+    const filteredRoster = filterRosterEntriesByQuery(rosterEntries, query);
+    if (filteredRoster.length > 0 && filteredRoster.length < rosterEntries.length) {
+      return filteredRoster.join('\n');
+    }
+  }
 
   const keywords = extractKeywords(query);
   const entityType = detectTargetEntityType(query);
@@ -633,11 +762,32 @@ export function generateLocalGroundedAnswer(
       });
     }
   } else {
-    // Check if query is asking who someone is (e.g. "quién es Cinthia Collado?", "quien es Cinthia Collado", or person name)
     const whoMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+|^)([a-záéíóú\s]+?)(?:\?|$)/i);
     const targetEntityType = detectTargetEntityType(query);
+    const rosterLines = relevantExcerpt.split('\n').map(l => l.trim()).filter(Boolean);
+    const isRoster = rosterLines.length > 0 && rosterLines.every(l => l.includes('-') || l.includes('–'));
 
-    if (whoMatch && (targetEntityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
+    if (isRoster) {
+      const siteMatch = query.match(/\b(foresta|sunset|[A-ZÁÉÍÓÚ][a-zñáéíóú]{3,})\b/i);
+      const siteWord = siteMatch ? siteMatch[0].charAt(0).toUpperCase() + siteMatch[0].slice(1).toLowerCase() : cleanSiteName(primary.manual.title);
+
+      if (rosterLines.length > 1) {
+        const bulletList = rosterLines.map(l => {
+          const parts = l.split(/\s*[-–—]\s*/);
+          if (parts.length >= 2) {
+            const role = parts.slice(1).join(' - ').replace(new RegExp(`\\b${siteWord}\\b`, 'gi'), '').trim();
+            return `- **${parts[0]}:** ${role || parts.slice(1).join(' - ')}`;
+          }
+          return `- ${l}`;
+        }).join('\n');
+        answer = `En **${siteWord}**, el personal correspondiente es:\n${bulletList}\n\n[${primary.manual.code}: ${primary.section.articleNumber}].`;
+      } else {
+        const parts = rosterLines[0].split(/\s*[-–—]\s*/);
+        const name = parts[0];
+        const role = parts.slice(1).join(' - ').replace(new RegExp(`\\b${siteWord}\\b`, 'gi'), '').trim();
+        answer = `En **${siteWord}**, **${name}** está a cargo de: **${role || parts.slice(1).join(' - ')}** [${primary.manual.code}: ${primary.section.articleNumber}].`;
+      }
+    } else if (whoMatch && (targetEntityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
       const targetName = whoMatch[1].trim();
       const siteName = cleanSiteName(primary.manual.title);
       const normEx = normalizeText(relevantExcerpt);

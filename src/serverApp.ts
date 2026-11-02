@@ -64,6 +64,31 @@ function enforceLaserSpecificAnswer(
     return `Según el **${primary.manual.title}** (${citation}): **${excerpt}**`;
   }
 
+  // 3. Multi-site query enforcement:
+  // If query specifies a site (e.g. Foresta, Sunset), guarantee output contains ONLY that site and never other sites
+  const normQuery = normalizeText(query);
+  const candidateSites = ['foresta', 'sunset', 'jaco', 'hermosa', 'bavaro'];
+  const queriedSites = candidateSites.filter(s => normQuery.includes(s));
+  if (queriedSites.length === 1) {
+    const targetSite = queriedSites[0];
+    const otherSites = candidateSites.filter(s => s !== targetSite);
+    const hasOtherSite = otherSites.some(s => normalizeText(generatedText).includes(s));
+    if (hasOtherSite) {
+      const excerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
+      const siteWord = targetSite.charAt(0).toUpperCase() + targetSite.slice(1);
+      const lines = excerpt.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length > 1) {
+        const bulletList = lines.map(l => {
+          const parts = l.split(/\s*[-–—]\s*/);
+          return parts.length >= 2 ? `- **${parts[0]}:** ${parts.slice(1).join(' - ')}` : `- ${l}`;
+        }).join('\n');
+        return `En **${siteWord}**, el personal correspondiente es:\n${bulletList}\n\n${citation}`;
+      } else if (lines.length === 1) {
+        return `En **${siteWord}**, ${lines[0]} ${citation}.`;
+      }
+    }
+  }
+
   return generatedText;
 }
 
@@ -275,7 +300,21 @@ REGLAS ESENCIALES DE CONVERSACIÓN:
      - ✅ RESPUESTA CORRECTA: "Ella es la administradora de **Foresta Residence** (Jaco Desarrollos / Holiday Rentals) [MAN-4110: Info]."
      - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Pegar el texto del manual con las entradas y salidas, registro diario de visitas, piscinas o limpiezas generales.
 
-   - Tu respuesta debe ser de 1 sola oración limpia, amable y directa. Resalta el dato exacto en **negrita**. Termina con la cita [CÓDIGO: Art.].
+    * Caso 5 - Personal de múltiples sitios o sedes (ej: Foresta vs Sunset):
+      - Manual: "Hay 3 Alexander: Alexander - Mantenimiento Foresta, Alexander - Mantenimiento Sunset, Alexander - Tecnico Sunset. Luego estan: Farida - Liempeza Sunset, Heidi - Limpieza Foresta"
+      - Si el usuario pregunta por un sitio específico (ej. "Foresta", "personal de Foresta", "Alexander de Foresta"):
+        DEBES MOSTRAR ÚNICAMENTE lo correspondiente a ESE sitio. ESTÁ ESTRICTAMENTE PROHIBIDO mostrar personal o datos de otros sitios (como Sunset).
+      - Ejemplo consulta: "Foresta" o "quiénes están en Foresta?"
+        ✅ RESPUESTA CORRECTA:
+        "En **Foresta**, el personal asignado es:
+        - **Alexander:** Mantenimiento
+        - **Heidi:** Limpieza [MAN-XXXX: Art. X]."
+      - Ejemplo consulta: "quién es Alexander en Foresta?" o "Alexander Foresta":
+        ✅ RESPUESTA CORRECTA:
+        "En **Foresta**, Alexander está a cargo de **Mantenimiento** [MAN-XXXX: Art. X]."
+      - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Mencionar a Alexander de Sunset, al técnico de Sunset o a Farida de Sunset.
+
+   - Tu respuesta debe ser limpia, amable y directa. Resalta los nombres y cargos en **negrita**. Termina con la cita [CÓDIGO: Art.].
 
 2. LÍMITE AMISTOSO PARA TEMAS FUERA DE LUGAR (OFF-TOPIC):
    Si el trabajador te pregunta sobre cosas que nada que ver con el trabajo —por ejemplo: anime (como Naruto, Dragon Ball, One Piece), películas, videojuegos, chistes, deportes o fútbol, recetas de cocina, tareas del colegio o cultura general— NO seas robótico, ni digas "Error", ni te comportes como una pared fría.
@@ -321,9 +360,10 @@ ${contextMarkdown}
 
 [INSTRUCCIÓN CRÍTICA DE RESPUESTA]:
 - Responde ÚNICAMENTE la respuesta precisa y directa a lo consultado ("${message}").
+- Si la consulta es sobre un sitio específico (ej: Foresta, Sunset), responde ÚNICAMENTE sobre ese sitio y ESTÁ ESTRICTAMENTE PROHIBIDO mencionar o listar personal de otros sitios.
 - Si preguntan quién es una persona (ej: "¿quién es Cinthia Collado?"), responde DIRECTAMENTE quién es en el sitio o manual (ej: "Ella es la administradora de Foresta Residence").
 - PROHIBIDO transcribir el manual, repetir oraciones completas o agregar tareas/obligaciones secundarias (como bitácoras, reportes, entradas/salidas, áreas comunes) que no te hayan preguntado.
-- Máximo 1 sola oración directa y amable, destacando el dato exacto en negrita y agregando la cita entre corchetes [CÓDIGO: Art.].`;
+- Respuesta directa, destacando datos o cargos en negrita y agregando la cita entre corchetes [CÓDIGO: Art.].`;
 
         formattedContents.push({
           role: 'user',

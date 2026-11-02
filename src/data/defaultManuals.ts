@@ -63,5 +63,34 @@ export const DEFAULT_MANUALS: ManualDocument[] = [
         keyPoints: ['Verificación de video', 'Notificación a patrulla y policía']
       }
     ]
+  },
+  {
+    id: 'man-4110',
+    title: 'Puesto 25 - Foresta Residence (1)',
+    code: 'MAN-4110',
+    category: 'seguridad',
+    version: '1.0',
+    updatedDate: '2026-10-30',
+    department: 'Seguridad Operativa',
+    iconName: 'ShieldCheck',
+    summary: 'Directrices del puesto 25 Foresta Residence y asignaciones de personal por sede.',
+    sections: [
+      {
+        id: 'sec-foresta-info',
+        articleNumber: 'Info',
+        title: 'Personal Autorizado y Administración',
+        tags: ['foresta', 'cinthia', 'collado', 'administracion', 'jaco'],
+        content: 'Foresta Residence / Puesto 25.0 / SI -01 En primer lugar, se debe controlar las entradas y salidas del puesto, así como llevar el registro de dichas entradas o salidas.o actuales como pendientes ➤ Al registr o diario de visitas, sus horas de ingreso y las visitas pendientes ➤ Personal autorizado por administración (Cinthia Collado/Jaco Desarrollos/H.W./HOLIDAY RENTALS /Áreas comunes (reciclar basura, fumigar, mantenimiento de piscinas, limpiezas generales, trabajos o',
+        keyPoints: ['Personal autorizado por administración: Cinthia Collado (Jaco Desarrollos / Holiday Rentals)', 'Control de entradas y salidas']
+      },
+      {
+        id: 'sec-foresta-personal',
+        articleNumber: 'Personal',
+        title: 'Asignación de Personal Foresta y Sunset',
+        tags: ['personal', 'foresta', 'sunset', 'alexander', 'farida', 'heidi', 'mantenimiento', 'limpieza', 'tecnico'],
+        content: 'Hay 3 Alexander: Alexander - Mantenimiento Foresta Alexander - Mantenimiento Sunset Alexander - Tecnico Sunset Luego estan: Farida - Liempeza Sunset Heidi - Limpieza Foresta',
+        keyPoints: ['Alexander - Mantenimiento Foresta', 'Alexander - Mantenimiento Sunset', 'Alexander - Tecnico Sunset', 'Farida - Liempeza Sunset', 'Heidi - Limpieza Foresta']
+      }
+    ]
   }
 ];
