@@ -216,3 +216,18 @@ test('extractRelevantExcerpt extracts ONLY the responsible person and contact fr
   assert.ok(!extracted.includes('Introducción y Filosofía'));
 });
 
+test('extractRelevantExcerpt extracts ONLY the requested person from arrow-delimited manual text', () => {
+  const forestaText = 'Foresta Residence / Puesto 25.0 / SI -01 En primer lugar, se debe controlar las entradas y salidas del puesto, así como llevar el registro de dichas entradas o salidas.o actuales como pendientes ➤ Al registr o diario de visitas, sus horas de ingreso y las visitas pendientes ➤ Personal autorizado por administración (Cinthia Collado/Jaco Desarrollos/H.W./HOLIDAY RENTALS /Áreas comunes (reciclar basura, fumigar, mantenimiento de piscinas, limpiezas generales, trab aios o';
+
+  const query = 'quien es cinthia collado?';
+  const extracted = extractRelevantExcerpt(forestaText, query);
+
+  // Must contain the specific person and authorization
+  assert.ok(extracted.includes('Cinthia Collado'));
+  assert.ok(extracted.includes('Personal autorizado'));
+  // Must NOT contain the rest of the manual
+  assert.ok(!extracted.includes('entradas y salidas'));
+  assert.ok(!extracted.includes('diario de visitas'));
+  assert.ok(!extracted.includes('mantenimiento de piscinas'));
+});
+

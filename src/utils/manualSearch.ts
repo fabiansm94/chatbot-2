@@ -428,12 +428,13 @@ export function extractRelevantExcerpt(
     }
   }
 
-  // 3. Entity-specific sentence extraction
-  // Split targetText into clean sentences
+  // 3. Entity-specific sentence and bullet item extraction
+  // Split targetText into clean segments using sentence endings, newlines, bullet symbols (➤, •, etc.) and topic slashes
+  const segmentPattern = /(?:\s*[➤►▸➜➔➡•●○▪▫■□✓✔√|\n\r]+\s*|(?<=[.!?])\s+|;\s+|\s+\/\s*(?=[A-ZÁÉÍÓÚ]))/;
   const sentences = targetText
-    .split(/(?<=[.!?\n])\s+/)
+    .split(segmentPattern)
     .map(s => s.trim())
-    .filter(s => s.length > 8);
+    .filter(s => s.length > 3);
 
   const scoredSentences: { sentence: string; score: number }[] = [];
 
@@ -443,7 +444,7 @@ export function extractRelevantExcerpt(
     let score = 0;
 
     for (const kw of keywords) {
-      if (norm.includes(kw)) score += 12;
+      if (norm.includes(kw)) score += 18;
     }
 
     if (entityType === 'schedule') {
@@ -451,7 +452,7 @@ export function extractRelevantExcerpt(
         score += 35;
       }
     } else if (entityType === 'person') {
-      if (/\b(responsable|encargad[oa]|jefe|jefatura|coordinador[a]?|oficial|supervisor[a]?|gerente|operador|director[a]?|contacto|correo|email|anexo|telefono)\b/i.test(norm)) {
+      if (/\b(responsable|encargad[oa]|jefe|jefatura|coordinador[a]?|oficial|supervisor[a]?|gerente|operador|director[a]?|contacto|correo|email|anexo|telefono|personal autorizado|autorizad[oa])\b/i.test(norm)) {
         score += 35;
       }
       if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(s)) {
@@ -476,6 +477,11 @@ export function extractRelevantExcerpt(
     if (top.score >= 15 || entityType !== 'general') {
       let result = refineClause(top.sentence);
       
+      // Close unclosed parenthesis if segment was split
+      if (result.includes('(') && !result.includes(')')) {
+        result += ')';
+      }
+
       // If there is an immediate complementary sentence that adds critical clarification (e.g. Saturdays, email, details)
       const topIdx = sentences.indexOf(top.sentence);
       if (topIdx !== -1 && topIdx + 1 < sentences.length && entityType === 'general') {
@@ -603,9 +609,7 @@ export function generateLocalGroundedAnswer(
     }
   } else {
     // Direct and concise coworker tone (never dumps the whole manual)
-    answer = `¡Hola! Mira, sobre lo que preguntas, el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]) establece puntualmente lo siguiente:\n\n`;
-    answer += `${relevantExcerpt}\n\n`;
-    answer += `*(Si deseas ver el artículo completo, abajo tienes la referencia oficial [${primary.section.articleNumber}]).*`;
+    answer = `¡Hola! Según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]):\n\n**${relevantExcerpt}**\n\n*(Referencia oficial: [${primary.section.articleNumber}]).*`;
   }
 
   return {
