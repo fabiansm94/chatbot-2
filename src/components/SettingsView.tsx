@@ -14,7 +14,7 @@ import {
 import { ManualDocument, KnowledgeProposal } from '../types/manual';
 import { ApprovalsView } from './ApprovalsView';
 import { EmbedIntegrationView } from './EmbedIntegrationView';
-import { USERS } from '../data/users';
+import { AppUser, getLocalUsers, loadUsersFromFirestore, formatUserName } from '../utils/userAuth';
 
 interface SettingsViewProps {
   companyName: string;
@@ -44,6 +44,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [nameInput, setNameInput] = useState(companyName);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [usersList, setUsersList] = useState<AppUser[]>(() => getLocalUsers());
+
+  React.useEffect(() => {
+    loadUsersFromFirestore()
+      .then(loaded => {
+        if (loaded && loaded.length > 0) {
+          setUsersList(loaded);
+        }
+      })
+      .catch(console.warn);
+  }, []);
 
   const handleSaveName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,24 +281,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         {activeSubTab === 'users' && (
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-bold text-white">Credenciales de Operadores</h4>
+                <p className="text-xs text-slate-400">Códigos de acceso autorizados para ingreso en estaciones</p>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {USERS.map((user) => {
+              {usersList.map((user) => {
                 const UserCard = () => {
                   const [showPass, setShowPass] = useState(false);
                   return (
                     <div className="p-4 rounded-2xl bg-[#262835] border border-[#3e4153] shadow-md flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#ca4048]/20 text-[#ca4048] flex items-center justify-center">
-                          <User className="w-4 h-4" />
+                        <div className="w-8 h-8 rounded-full bg-[#ca4048]/20 text-[#ca4048] flex items-center justify-center font-bold text-xs">
+                          {user.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-white capitalize">{user.name}</div>
+                          <div className="text-sm font-bold text-white capitalize">{formatUserName(user.name)}</div>
                           <div className="text-xs text-slate-400 font-mono">
                             {showPass ? user.password : '••••••'}
                           </div>
                         </div>
                       </div>
-                      <button onClick={() => setShowPass(!showPass)} className="text-slate-400 hover:text-[#ca4048] transition-colors">
+                      <button onClick={() => setShowPass(!showPass)} className="text-slate-400 hover:text-[#ca4048] transition-colors p-1.5 cursor-pointer">
                         {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
@@ -298,6 +315,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
