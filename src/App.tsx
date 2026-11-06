@@ -431,15 +431,15 @@ export default function App() {
   const handleSubmitProposal = (newProp: KnowledgeProposal) => {
     setProposals(prev => [newProp, ...prev.filter(p => p.id !== newProp.id)]);
     setDoc(doc(db, 'proposals', newProp.id), newProp).catch(console.warn);
-    showToast('Enseñanza enviada. Pendiente de aprobación por el administrador Fabian.');
+    showToast('Enseñanza enviada. Pendiente de aprobación por el Admin.');
   };
 
   const handleApproveProposal = (prop: KnowledgeProposal, _approverName?: string) => {
     if (!isFabian) {
-      showToast('Solo el administrador Fabian puede aceptar enseñanzas.');
+      showToast('Solo el Admin puede aceptar enseñanzas.');
       return;
     }
-    const { updatedManuals, approvedProposal } = approveProposal(prop, manuals, 'Fabian');
+    const { updatedManuals, approvedProposal } = approveProposal(prop, manuals, 'Admin');
     setManuals(updatedManuals);
     setProposals(prev => prev.map(p => (p.id === prop.id ? approvedProposal : p)));
     const createdOrUpdatedManual = updatedManuals[0];
@@ -447,18 +447,18 @@ export default function App() {
       setDoc(doc(db, 'manuals', createdOrUpdatedManual.id), createdOrUpdatedManual).catch(console.warn);
     }
     setDoc(doc(db, 'proposals', prop.id), approvedProposal).catch(console.warn);
-    showToast(`¡Aceptado por Fabian! El manual "${prop.title}" ha sido incorporado.`);
+    showToast(`¡Aceptado por Admin! El manual "${prop.title}" ha sido incorporado.`);
   };
 
   const handleRejectProposal = (prop: KnowledgeProposal, reason: string, _approverName?: string) => {
     if (!isFabian) {
-      showToast('Solo el administrador Fabian puede rechazar enseñanzas.');
+      showToast('Solo el Admin puede rechazar enseñanzas.');
       return;
     }
-    const rejected = rejectProposal(prop, reason, 'Fabian');
+    const rejected = rejectProposal(prop, reason, 'Admin');
     setProposals(prev => prev.map(p => (p.id === prop.id ? rejected : p)));
     setDoc(doc(db, 'proposals', prop.id), rejected).catch(console.warn);
-    showToast('Enseñanza rechazada por Fabian.');
+    showToast('Enseñanza rechazada por Admin.');
   };
 
   const pendingApprovalsCount = proposals.filter(p => p.status === 'pending').length;

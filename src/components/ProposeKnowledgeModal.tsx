@@ -253,7 +253,7 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
           <div className="p-3 rounded-xl bg-[#262835] border border-[#3e4153] text-xs text-slate-200 flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-[#ca4048] shrink-0 mt-0.5" />
             <span>
-              <strong className="text-white">Requiere aprobación del administrador (Fabian):</strong> Esta enseñanza no se guardará inmediatamente. Se enviará como propuesta pendiente y solo se incorporará a AI-zen cuando <strong className="text-white">Fabian</strong> la acepte.
+              <strong className="text-white">Requiere aprobación del administrador (Admin):</strong> Esta enseñanza no se guardará inmediatamente. Se enviará como propuesta pendiente y solo se incorporará a AI-zen cuando el <strong className="text-white">Admin</strong> la acepte.
             </span>
           </div>
 
@@ -392,7 +392,7 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
         {/* Footer Buttons anchored at bottom of chat */}
         <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-[#262835] border-t border-[#3e4153] flex items-center justify-between gap-3 shrink-0 flex-wrap">
           <span className="text-[11px] text-amber-300 font-medium">
-            ⏳ Estado al enviar: Pendiente de aprobación por Fabian
+            ⏳ Estado al enviar: Pendiente de aprobación por Admin
           </span>
           <div className="flex items-center gap-2.5 ml-auto">
             <button

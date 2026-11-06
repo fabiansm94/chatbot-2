@@ -32,7 +32,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
       <div className="flex flex-col items-center gap-6">
         <div
           className="relative cursor-pointer group"
-          title={isFabian ? "Tu perfil de administrador (Fabian)" : "Perfil de operador"}
+          title={isFabian ? "Tu perfil de administrador (Admin)" : "Perfil de operador"}
           onClick={() => isFabian && setActiveTab('settings')}
         >
           <div className="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-pink-400 to-rose-600 ring-2 ring-white/70 shadow-lg group-hover:scale-105 transition-all flex items-center justify-center text-white font-bold text-xs uppercase">
@@ -98,7 +98,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
                     ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
                     : 'text-white/80 hover:text-white hover:bg-white/15'
                 }`}
-                title="Aprobación de Enseñanzas (Solo Fabian)"
+                title="Aprobación de Enseñanzas (Solo Admin)"
                 aria-label="Aprobaciones"
               >
                 <ShieldCheck className="w-5 h-5 stroke-[2.2]" />

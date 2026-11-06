@@ -27,7 +27,7 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const approverName = 'Fabian';
+  const approverName = 'Admin';
 
   const pendingCount = proposals.filter(p => p.status === 'pending').length;
   const approvedCount = proposals.filter(p => p.status === 'approved').length;
@@ -39,7 +39,7 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
   });
 
   const handleConfirmReject = (proposal: KnowledgeProposal) => {
-    const reasonToSave = rejectReason.trim() || 'No aprobado por el administrador Fabian';
+    const reasonToSave = rejectReason.trim() || 'No aprobado por el Admin';
     onReject(proposal, reasonToSave, approverName);
     setRejectingId(null);
     setRejectReason('');
@@ -56,20 +56,20 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
                 Control de Calidad
               </span>
               <span className="text-slate-400">/</span>
-              <span className="text-xs text-slate-300">Buzón Exclusivo de Fabian</span>
+              <span className="text-xs text-slate-300">Buzón Exclusivo de Admin</span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">
               Aprobación de Enseñanzas al Bot
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Las enseñanzas enviadas por los usuarios no se guardan inmediatamente. Como administrador (<strong className="text-white">Fabian</strong>), eres el único autorizado para aceptarlas o rechazarlas antes de que pasen a los manuales de AI-zen.
+              Las enseñanzas enviadas por los usuarios no se guardan inmediatamente. Como administrador (<strong className="text-white">Admin</strong>), eres el único autorizado para aceptarlas o rechazarlas antes de que pasen a los manuales de AI-zen.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
             <div className="px-3.5 py-2 rounded-xl bg-[#2f3140] border border-[#3e4153] text-xs flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-[#ca4048]" />
-              <span className="text-slate-300">Admin autorizado: <strong className="text-white">Fabian</strong></span>
+              <span className="text-slate-300">Rol: <strong className="text-white">Admin</strong></span>
             </div>
 
             <button
@@ -159,19 +159,19 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
                   {proposal.status === 'pending' && (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 flex items-center gap-1 border border-amber-500/30">
                       <Clock className="w-3 h-3 text-amber-400" />
-                      <span>Pendiente de aprobación por Fabian</span>
+                      <span>Pendiente de aprobación por Admin</span>
                     </span>
                   )}
                   {proposal.status === 'approved' && (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 flex items-center gap-1 border border-emerald-500/30">
                       <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      <span>Aceptado por {proposal.reviewedBy || 'Fabian'}</span>
+                      <span>Aceptado por Admin</span>
                     </span>
                   )}
                   {proposal.status === 'rejected' && (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#ca4048]/20 text-[#ca4048] flex items-center gap-1 border border-[#ca4048]/40">
                       <XCircle className="w-3 h-3 text-[#ca4048]" />
-                      <span>Rechazado por {proposal.reviewedBy || 'Fabian'}</span>
+                      <span>Rechazado por Admin</span>
                     </span>
                   )}
 

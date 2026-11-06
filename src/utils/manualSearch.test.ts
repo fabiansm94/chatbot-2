@@ -406,4 +406,44 @@ El camión recolector de basura pasa los martes y jueves.`;
   assert.ok(!exLlaves.includes('camión recolector'));
 });
 
+test('extractRelevantExcerpt extracts ONLY the specific comma-separated clause for MC55 SABO INTERNACIONAL', () => {
+  const saboManualText =
+    'MC55 SABO INTERNACIONAL Buenas, nuevo MC, 8 cámaras, cuenta con un oficial, el cual se encuentra a 30 metros, en caso de que este oficial necesite soporte se envia a GEO.';
+
+  // 1. Query: que motorizado se envia a Sabo?
+  const exMotorizado = extractRelevantExcerpt(
+    saboManualText,
+    'que motorizado se envia a Sabo?',
+    undefined,
+    'MC55 SABO INTERNACIONAL'
+  );
+  assert.ok(exMotorizado.includes('GEO'), `Expected GEO in "${exMotorizado}"`);
+  assert.ok(!exMotorizado.includes('8 cámaras'), `Must not include 8 cámaras in "${exMotorizado}"`);
+  assert.ok(!exMotorizado.includes('30 metros'), `Must not include 30 metros in "${exMotorizado}"`);
+  assert.ok(!exMotorizado.includes('Buenas, nuevo MC'), `Must not include greeting in "${exMotorizado}"`);
+
+  // 2. Query: cuantas camaras tiene Sabo?
+  const exCamaras = extractRelevantExcerpt(
+    saboManualText,
+    'cuantas camaras tiene Sabo?',
+    undefined,
+    'MC55 SABO INTERNACIONAL'
+  );
+  assert.ok(exCamaras.includes('8 cámaras'), `Expected 8 cámaras in "${exCamaras}"`);
+  assert.ok(!exCamaras.includes('GEO'), `Must not include GEO in "${exCamaras}"`);
+  assert.ok(!exCamaras.includes('30 metros'), `Must not include 30 metros in "${exCamaras}"`);
+
+  // 3. Query: a cuantos metros se encuentra el oficial en Sabo?
+  const exMetros = extractRelevantExcerpt(
+    saboManualText,
+    'a cuantos metros se encuentra el oficial en Sabo?',
+    undefined,
+    'MC55 SABO INTERNACIONAL'
+  );
+  assert.ok(exMetros.includes('30 metros'), `Expected 30 metros in "${exMetros}"`);
+  assert.ok(!exMetros.includes('8 cámaras'), `Must not include 8 cámaras in "${exMetros}"`);
+  assert.ok(!exMetros.includes('GEO'), `Must not include GEO in "${exMetros}"`);
+});
+
+
 

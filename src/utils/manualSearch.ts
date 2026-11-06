@@ -286,7 +286,12 @@ export function searchManuals(
       }
 
       if (score > 0) {
-        const snippet = extractRelevantExcerpt(cleanedContent, query, section.keyPoints).slice(0, 220);
+        const snippet = extractRelevantExcerpt(
+          cleanedContent,
+          query,
+          section.keyPoints,
+          manual.title
+        ).slice(0, 220);
 
         results.push({
           manual,
@@ -298,9 +303,12 @@ export function searchManuals(
     }
   }
 
-  return results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxResults);
+  const sorted = results.sort((a, b) => b.score - a.score);
+  if (sorted.length > 1) {
+    const topScore = sorted[0].score;
+    return sorted.filter(r => r.score >= topScore * 0.45).slice(0, maxResults);
+  }
+  return sorted.slice(0, maxResults);
 }
 
 /**
@@ -318,7 +326,7 @@ export function buildManualContext(results: SearchResult[], query?: string): str
       const { manual, section } = res;
       const cleanedContent = cleanRawHtmlTags(section.content || '');
       const targetedData = query
-        ? extractRelevantExcerpt(cleanedContent, query, section.keyPoints)
+        ? extractRelevantExcerpt(cleanedContent, query, section.keyPoints, manual.title)
         : cleanedContent.slice(0, 300);
 
       return `### [REFERENCIA ${index + 1}]
@@ -618,20 +626,95 @@ function splitIntoGranularSegments(text: string): string[] {
   return segments;
 }
 
+const DOMAIN_SYNONYMS: Record<string, string[]> = {
+  motorizado: ['soporte', 'apoyo', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia', 'despacha', 'motorizado'],
+  soporte: ['motorizado', 'apoyo', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia'],
+  apoyo: ['motorizado', 'soporte', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia'],
+  camara: ['camaras', 'cctv', 'video', 'domo', 'monitoreo'],
+  camaras: ['camara', 'cctv', 'video', 'domo', 'monitoreo'],
+  oficial: ['oficiales', 'guarda', 'guardia', 'vigilante', 'efectivo'],
+  guarda: ['oficial', 'guardia', 'vigilante', 'efectivo'],
+  encargado: ['responsable', 'administrador', 'administradora', 'jefe', 'autorizado', 'supervisor'],
+  responsable: ['encargado', 'administrador', 'administradora', 'jefe', 'autorizado', 'supervisor'],
+  distancia: ['metros', 'kilometros', 'encuentra', 'ubicado'],
+  metros: ['distancia', 'encuentra', 'ubicado']
+};
+
 /**
- * Extracts only the specific, relevant data point (schedule, name, amount, list item, or concise sentence)
+ * Splits a sentence by commas outside parentheses into atomic clauses,
+ * keeping relative clauses (", el cual...") and conditional clauses ("En caso de..., ") attached.
+ */
+function splitIntoAtomicClauses(sentence: string): string[] {
+  // Split by comma or semicolon outside parentheses
+  const rawParts: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+
+  for (let i = 0; i < sentence.length; i++) {
+    const ch = sentence[i];
+    if (ch === '(') parenDepth++;
+    else if (ch === ')' && parenDepth > 0) parenDepth--;
+
+    if ((ch === ',' || ch === ';') && parenDepth === 0) {
+      if (current.trim()) rawParts.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) rawParts.push(current.trim());
+
+  if (rawParts.length <= 1) return [sentence];
+
+  // Step 1: Merge backward any relative clause starting with "el cual", "la cual", "quien", "donde", "que se", etc.
+  const backwardMerged: string[] = [];
+  for (const part of rawParts) {
+    const normPart = normalizeText(part);
+    if (
+      backwardMerged.length > 0 &&
+      /^(?:el cual|la cual|los cuales|las cuales|lo cual|quien|quienes|donde|cuyo|cuya|que se\b|mismo que\b|asi como\b)/i.test(normPart)
+    ) {
+      backwardMerged[backwardMerged.length - 1] = `${backwardMerged[backwardMerged.length - 1]}, ${part}`;
+    } else {
+      backwardMerged.push(part);
+    }
+  }
+
+  // Step 2: Merge forward any introductory conditional/temporal clause (e.g. "3. En caso de corte de energía", "Al recibir una alarma")
+  const finalClauses: string[] = [];
+  for (let i = 0; i < backwardMerged.length; i++) {
+    const part = backwardMerged[i];
+    const strippedListPrefix = part.replace(/^(?:\d{1,2}[.)]|[a-zA-Z][.)]|•|-)\s+/, '');
+    const normStripped = normalizeText(strippedListPrefix);
+
+    const isConditionalLeadIn =
+      /^(?:en caso de\b|al\s+\w+|cuando\b|si\b|para\b|previo a\b|antes de\b|despues de\b|una vez\b|en primer lugar\b)/i.test(normStripped) &&
+      normStripped.split(/\s+/).length <= 10;
+
+    if (isConditionalLeadIn && i + 1 < backwardMerged.length) {
+      backwardMerged[i + 1] = `${part}, ${backwardMerged[i + 1]}`;
+    } else {
+      finalClauses.push(part);
+    }
+  }
+
+  return finalClauses.length > 0 ? finalClauses : [sentence];
+}
+
+/**
+ * Extracts only the specific, relevant data point (schedule, name, amount, list item, or concise sentence/clause)
  * answering the user's query, filtering out unrelated subtitles and preventing full manual dumps.
  */
 export function extractRelevantExcerpt(
   content: string,
   query: string,
-  keyPoints?: string[]
+  keyPoints?: string[],
+  manualTitle?: string
 ): string {
   const cleanedContent = cleanRawHtmlTags(content || '');
   if (!cleanedContent) return '';
 
   // 0. Site-specific roster extraction:
-  // If the document contains multiple person-role entries across different sites (e.g. Foresta vs Sunset)
   const rosterEntries = parseRosterEntries(cleanedContent);
   if (rosterEntries.length >= 2) {
     const filteredRoster = filterRosterEntriesByQuery(rosterEntries, query);
@@ -645,6 +728,22 @@ export function extractRelevantExcerpt(
 
   const specificKeywords = keywords.filter(kw => !GENERIC_QUERY_VERBS.has(kw));
   const activeKeywords = specificKeywords.length > 0 ? specificKeywords : keywords;
+
+  // Detect title tokens (from manualTitle and/or leading uppercase prefix before "Buenas," / "/")
+  const titleWords = new Set<string>();
+  if (manualTitle) {
+    normalizeText(manualTitle).split(/\s+/).filter(w => w.length > 2).forEach(w => titleWords.add(w));
+  }
+  const leadingPrefixMatch = cleanedContent.match(
+    /^([A-Z0-9ÁÉÍÓÚÑ\s-]{3,45}?)(?:\s+(?:Buenas(?:\s+tardes|\s+noches)?|Buenos\s+d[ií]as|Hola)\b|\s*\/)/
+  );
+  if (leadingPrefixMatch) {
+    normalizeText(leadingPrefixMatch[1]).split(/\s+/).filter(w => w.length > 2).forEach(w => titleWords.add(w));
+  }
+
+  // Keywords that ask about the specific aspect inside the manual (excluding the manual/site name itself)
+  const questionFocusKws = specificKeywords.filter(kw => !titleWords.has(kw));
+  const clauseScoringKws = questionFocusKws.length > 0 ? questionFocusKws : activeKeywords;
 
   // 1. If key points exist, see if any key point directly answers the query
   if (keyPoints && keyPoints.length > 0 && activeKeywords.length > 0) {
@@ -676,34 +775,78 @@ export function extractRelevantExcerpt(
   let targetHeading: string | undefined = undefined;
   let matchedByHeadingOnly = false;
 
-  // Helper to strip unrelated secondary clauses (e.g. log reporting, secondary obligations)
-  const refineClause = (text: string): string => {
-    const clauseDelimiters = /\s*(?:,\s*(?:y\s+|adem[aá]s\s+|asimismo\s+|mientras que\s+|reportando\b|registrando\b|dejando\b|notificando\b|debiendo\b|indicando\b|anotando\b)|;\s*)/i;
-    if (!clauseDelimiters.test(text)) return text;
+  // Helper to strip repeated title/greeting prefix and extract only the specific comma/semicolon clause
+  const refineClause = (rawText: string): string => {
+    let text = rawText.trim();
 
-    const clauses = text.split(clauseDelimiters).map(c => c.trim()).filter(c => c.length > 5);
-    if (clauses.length <= 1) return text;
+    // Strip leading repeated manualTitle if present at the start of the text
+    if (manualTitle) {
+      const escapedTitle = manualTitle.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const titlePrefixRegex = new RegExp(`^${escapedTitle}\\s*[,.:;-]?\\s*`, 'i');
+      if (titlePrefixRegex.test(text) && text.length > manualTitle.length + 10) {
+        text = text.replace(titlePrefixRegex, '').trim();
+      }
+    }
 
-    let bestClause = text;
+    // Strip leading uppercase code/title + conversational greeting ("MC55 SABO INTERNACIONAL Buenas, nuevo MC, ")
+    text = text
+      .replace(/^(?:[A-Z0-9ÁÉÍÓÚÑ\s-]{2,45}?\s+)?(?:buenas(?:\s+tardes|\s+noches)?|buenos\s+d[ií]as|hola|saludos)\s*[,.:;-]\s*/i, '')
+      .replace(/^(?:nuevo\s+[a-z0-9]{1,10})\s*[,.:;-]\s*/i, '')
+      .trim();
+
+    // First check classic secondary gerund/conjunction delimiters
+    const gerundDelimiters = /\s*(?:,\s*(?:y\s+|adem[aá]s\s+|asimismo\s+|mientras que\s+|reportando\b|registrando\b|dejando\b|notificando\b|debiendo\b|indicando\b|anotando\b)|;\s*)/i;
+    const candidateClauses = splitIntoAtomicClauses(text);
+
+    const clauses =
+      candidateClauses.length > 1
+        ? candidateClauses
+        : gerundDelimiters.test(text)
+          ? text.split(gerundDelimiters).map(c => c.trim()).filter(c => c.length > 4)
+          : [text];
+
+    if (clauses.length <= 1) {
+      return text;
+    }
+
+    let bestClause = clauses[0];
     let bestScore = -1;
+    let zeroScoreCount = 0;
 
     for (const cl of clauses) {
       const norm = normalizeText(cl);
       const tokens = norm.split(/\s+/).filter(Boolean);
       let score = 0;
-      for (const kw of keywords) {
+      let hasKeywordOrSynonym = false;
+
+      for (const kw of clauseScoringKws) {
         const m = matchKeywordScore(norm, tokens, kw);
-        if (m > 0) score += (GENERIC_QUERY_VERBS.has(kw) ? 4 : 14) * m;
+        if (m > 0) {
+          score += (GENERIC_QUERY_VERBS.has(kw) ? 5 : 22) * m;
+          hasKeywordOrSynonym = true;
+        } else {
+          // Check domain synonyms (e.g. "motorizado" -> "soporte" / "geo" / "envia")
+          const syns = DOMAIN_SYNONYMS[kw] || DOMAIN_SYNONYMS[getSpanishStem(kw)] || [];
+          if (syns.some(syn => norm.includes(syn))) {
+            score += 18;
+            hasKeywordOrSynonym = true;
+          }
+        }
       }
-      if (entityType === 'schedule' && /\b(\d{1,2}:\d{2}|\d+\s*(am|pm|hrs|horas|minutos|min)|turno|horario|cada\s+\d+)\b/i.test(norm)) {
-        score += 25;
+
+      if (hasKeywordOrSynonym || questionFocusKws.length === 0) {
+        if (entityType === 'schedule' && /\b(\d{1,2}:\d{2}|\d+\s*(am|pm|hrs|horas|minutos|min)|turno|horario|cada\s+\d+)\b/i.test(norm)) {
+          score += 25;
+        }
+        if (entityType === 'person' && /\b(responsable|encargad|jefe|coordinador|oficial|contacto|correo|email|geo)\b/i.test(norm)) {
+          score += 25;
+        }
+        if (entityType === 'amount' && /\b(\d+|un|una|dos|tres|cuatro|cinco|plazo|anticipacion|dias|metros|camaras|monto|\$)\b/i.test(norm)) {
+          score += 25;
+        }
       }
-      if (entityType === 'person' && /\b(responsable|encargad|jefe|coordinador|oficial|contacto|correo|email)\b/i.test(norm)) {
-        score += 25;
-      }
-      if (entityType === 'amount' && /\b(\d+|plazo|anticipacion|dias|monto|\$)\b/i.test(norm)) {
-        score += 25;
-      }
+
+      if (score === 0) zeroScoreCount++;
 
       if (score > bestScore) {
         bestScore = score;
@@ -711,8 +854,9 @@ export function extractRelevantExcerpt(
       }
     }
 
-    if (bestScore >= 10 && bestClause.length < text.length * 0.9) {
-      return bestClause.endsWith('.') ? bestClause : bestClause + '.';
+    if (bestScore >= 12 && (zeroScoreCount > 0 || bestClause.length < text.length * 0.85)) {
+      const formatted = bestClause.charAt(0).toUpperCase() + bestClause.slice(1);
+      return /[.!?]$/.test(formatted) ? formatted : `${formatted}.`;
     }
     return text;
   };
@@ -979,7 +1123,12 @@ export function generateLocalGroundedAnswer(
 
   const primary = results[0];
   const citations = extractCitations(results);
-  const relevantExcerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
+  const relevantExcerpt = extractRelevantExcerpt(
+    primary.section.content,
+    query,
+    primary.section.keyPoints,
+    primary.manual.title
+  );
 
   let answer = '';
 

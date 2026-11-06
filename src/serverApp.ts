@@ -55,7 +55,12 @@ function enforceLaserSpecificAnswer(
   }
 
   // 2. If the LLM generates a full manual dump, repeats the preamble, or outputs much more than the specific excerpt:
-  const excerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
+  const excerpt = extractRelevantExcerpt(
+    primary.section.content,
+    query,
+    primary.section.keyPoints,
+    primary.manual.title
+  );
   if (
     /establece puntualmente lo siguiente/i.test(generatedText) ||
     /en primer lugar, se debe controlar/i.test(generatedText) ||
