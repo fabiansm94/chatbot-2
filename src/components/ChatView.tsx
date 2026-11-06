@@ -11,7 +11,8 @@ import {
   CheckCheck,
   ShieldCheck,
   MoreVertical,
-  LogOut
+  LogOut,
+  Sparkles
 } from 'lucide-react';
 import { ChatMessage, Citation, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
 import { FormattedContent } from './FormattedContent';
@@ -46,6 +47,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onSendMessage,
   onClearChat,
   onOpenCitation,
+  onOpenProposeModal,
   loggedUserName,
   onLogout,
   viewMode = 'web',
@@ -157,10 +159,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <div className="absolute top-full right-0 mt-2 z-50 w-64 bg-white rounded-2xl shadow-2xl border border-rose-100 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3.5 py-2 border-b border-rose-100 font-bold text-[#b82733] flex items-center justify-between">
                 <span>Opciones de AI-zen</span>
-                <span className="text-[10px] text-slate-400 font-normal">
-                  {isEmbedMode ? 'Chat Embed' : isPhone ? 'Vista Teléfono' : 'Vista Web'}
-                </span>
+                {!isEmbedMode && (
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {isPhone ? 'Vista Teléfono' : 'Vista Web'}
+                  </span>
+                )}
               </div>
+              {onOpenProposeModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    onOpenProposeModal();
+                  }}
+                  className="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 text-slate-700 hover:text-[#b82733] flex items-center gap-2 text-xs font-semibold transition-colors border-b border-rose-50 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#b82733]" />
+                  <span>Enseñar al Bot</span>
+                </button>
+              )}
               {!isEmbedMode && onChangeViewMode && (
                 <button
                   type="button"
@@ -170,7 +187,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     onChangeViewMode(next);
                     setHeaderMenuOpen(false);
                   }}
-                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-slate-700 hover:text-[#b82733] flex items-center justify-between text-xs transition-colors border-b border-rose-50"
+                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-slate-700 hover:text-[#b82733] flex items-center justify-between text-xs transition-colors border-b border-rose-50 cursor-pointer"
                 >
                   <span>Cambiar a {currentMode === 'web' ? 'Vista Teléfono' : 'Vista Web'}</span>
                   <span className="text-[10px] font-semibold text-[#b82733] bg-rose-50 px-2 py-0.5 rounded-full">
@@ -185,7 +202,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     setHeaderMenuOpen(false);
                     onClearChat();
                   }}
-                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-slate-700 hover:text-[#b82733] flex items-center gap-2 text-xs transition-colors"
+                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-slate-700 hover:text-[#b82733] flex items-center gap-2 text-xs transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-[#b82733]" />
                   <span>Limpiar Chat</span>
@@ -198,7 +215,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     setHeaderMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-[#b82733] flex items-center gap-2 border-t border-rose-100 text-xs font-semibold transition-colors"
+                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-[#b82733] flex items-center gap-2 border-t border-rose-100 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5 text-[#b82733]" />
                   <span>Cerrar Sesión</span>

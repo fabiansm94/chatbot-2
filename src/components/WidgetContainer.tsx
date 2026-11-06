@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ManualDocument, ManualSection, ChatMessage, Citation, UserChatThread } from '../types/manual';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { ManualDocument, ManualSection, ChatMessage, Citation, UserChatThread, KnowledgeProposal } from '../types/manual';
 import { ChatView } from './ChatView';
 import { ManualDrawer } from './ManualDrawer';
+import { ProposeKnowledgeModal } from './ProposeKnowledgeModal';
 import { DEFAULT_MANUALS } from '../data/defaultManuals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from '../data/userChatThreads';
 import { searchManuals, generateLocalGroundedAnswer } from '../utils/manualSearch';
@@ -49,7 +52,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       const fromUrl = params.get('company');
       if (fromUrl) return fromUrl;
     }
-    return localStorage.getItem(STORAGE_KEY_COMPANY) || initialCompanyName || 'STS Security';
+    return localStorage.getItem(STORAGE_KEY_COMPANY) || initialCompanyName || 'Control y Monitoreo';
   });
 
   const [threads, setThreads] = useState<UserChatThread[]>(DEFAULT_USER_THREADS);
@@ -61,12 +64,20 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerManual, setDrawerManual] = useState<ManualDocument | null>(null);
   const [drawerSection, setDrawerSection] = useState<ManualSection | null>(null);
+  const [proposeModalOpen, setProposeModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       localStorage.setItem('manualbot_widget_threads_v3', JSON.stringify(threads));
     } catch (e) {}
   }, [threads]);
+
+  const handleSubmitProposal = (newProp: KnowledgeProposal) => {
+    setDoc(doc(db, 'proposals', newProp.id), newProp).catch(console.warn);
+    setToastMessage('¡Propuesta enviada al buzón de aprobaciones!');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const handleSendMessage = async (text: string) => {
     setActiveThreadId('current-user');
@@ -159,7 +170,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   };
 
   return (
-    <div className="w-full h-full bg-[#fff8f8] text-slate-800 flex flex-col overflow-hidden font-sans">
+    <div className="w-full h-full bg-[#fff8f8] text-slate-800 flex flex-col overflow-hidden font-sans relative">
       <main className="flex-1 flex flex-col overflow-hidden bg-[#fff8f8] w-full h-full">
         <ChatView
           threads={threads}
@@ -172,6 +183,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           companyName={companyName}
           hasGeminiKey={hasGeminiKey}
           manuals={manuals}
+          onOpenProposeModal={() => setProposeModalOpen(true)}
           onOpenSection={handleOpenSection}
           viewMode="phone"
           allowModeToggle={false}
@@ -189,6 +201,20 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           handleSendMessage(`¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`);
         }}
       />
+
+      <ProposeKnowledgeModal
+        isOpen={proposeModalOpen}
+        onClose={() => setProposeModalOpen(false)}
+        onSubmitProposal={handleSubmitProposal}
+        manuals={manuals}
+      />
+
+      {toastMessage && (
+        <div className="fixed bottom-16 right-4 z-50 px-3.5 py-2.5 rounded-xl bg-[#2f3140] border border-[#ca4048] shadow-2xl text-xs text-white flex items-center gap-2 animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-[#ca4048] animate-pulse" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 };
