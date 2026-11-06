@@ -524,6 +524,40 @@ Provincia: Puntarenas Cantón : Garabito Distrito: Jaco Dirección : 3ra entrada
   const staffAnswer = generateLocalGroundedAnswer('quien es el staff de foresta?', staffResults, 'direct');
   assert.ok(staffAnswer.answer.includes('Jairo') && staffAnswer.answer.includes('Heidi'), `Expected staff members in "${staffAnswer.answer}"`);
   assert.ok(!staffAnswer.answer.includes('figura en'), `Should not contain robotic "figura en" in "${staffAnswer.answer}"`);
+  assert.ok(!staffAnswer.answer.includes('Se debe 1-'), `Should not contain procedural fragment in "${staffAnswer.answer}"`);
+});
+
+test('cleanProceduralPrefix and staff query "y tienes los nombres del staff de foresta??" formats properly', () => {
+  const protocolManual: ManualDocument = {
+    id: 'man-protocolo-foresta',
+    code: 'MAN-6246',
+    title: 'Protocolo de SI 01 Foresta',
+    category: 'seguridad',
+    version: '1.0',
+    updatedDate: '2026-11-06',
+    department: 'Seguridad',
+    iconName: 'ShieldCheck',
+    summary: 'Protocolo de SI 01 Foresta',
+    sections: [
+      {
+        id: 'sec-proto-foresta',
+        articleNumber: 'Manual Oficial',
+        title: 'Protocolo de SI 01 Foresta',
+        tags: ['foresta', 'protocolo'],
+        content: 'piscina y el rancho, tenemos un parlante, lo ideal es hablarle a las personas por el parlante y si hacen caso todo bien, de no hacer caso, se debe 1- si esta el staff de Foresta, Jairo, Heidi o Alexander, Tambien a veces puede estar jordan. Ellos nos pueden ayudar en casos que se necesite asistencia física.'
+      }
+    ]
+  };
+
+  const results = searchManuals('y tienes los nombres del staff de foresta??', [protocolManual]);
+  const localAnswer = generateLocalGroundedAnswer('y tienes los nombres del staff de foresta??', results, 'direct');
+
+  assert.ok(localAnswer.answer.includes('Jairo'), 'Should include Jairo');
+  assert.ok(localAnswer.answer.includes('Heidi'), 'Should include Heidi');
+  assert.ok(localAnswer.answer.includes('Alexander'), 'Should include Alexander');
+  assert.ok(!localAnswer.answer.includes('Se debe 1-'), 'Must NOT start with "Se debe 1-"');
+  assert.ok(!localAnswer.answer.includes('si esta el staff'), 'Must NOT have raw "si esta el staff" clause');
+  assert.ok(localAnswer.answer.includes('conformado por') || localAnswer.answer.includes('staff registrado'), 'Must be a complete, well-formed sentence');
 });
 
 

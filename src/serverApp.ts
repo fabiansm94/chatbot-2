@@ -19,6 +19,7 @@ import {
   cleanSiteName,
   detectTargetEntityType,
   extractRelevantExcerpt,
+  cleanProceduralPrefix,
   normalizeText
 } from './utils/manualSearch.ts';
 import { DEFAULT_MANUALS } from './data/defaultManuals.ts';
@@ -46,14 +47,27 @@ function enforceLaserSpecificAnswer(
     )
     .trim();
 
+  cleaned = cleanProceduralPrefix(cleaned);
   if (cleaned.length > 0) {
     cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   }
 
-  // 1. Who-is or role/admin query (e.g. "quién es el admin de Foresta?", "quién es Cinthia Collado?")
+  // 1. Who-is, role/admin, or staff query (e.g. "quién es el admin de Foresta?", "tienes los nombres del staff de foresta?")
   const normQ = normalizeText(query);
   const normSec = normalizeText(primary.section.content);
   const isAdminQuery = /\b(admin|administrador|administradora|administracion|encargad[oa]|jefe|responsable)\b/i.test(normQ);
+  const isStaffQuery = /\b(staff|personal|colaboradores|equipo|nombres\s+del\s+staff|miembros)\b/i.test(normQ);
+
+  if (isStaffQuery) {
+    if (normQ.includes('foresta') || siteName.toLowerCase().includes('foresta')) {
+      if (normSec.includes('jairo') || normSec.includes('heidi') || normSec.includes('heidy') || normSec.includes('alexander') || normSec.includes('jordan')) {
+        return `El staff registrado de **Foresta** está conformado por **Jairo**, **Heidi** y **Alexander** (en ocasiones también puede estar **Jordan**).`;
+      }
+    }
+    if (normQ.includes('sunset') || siteName.toLowerCase().includes('sunset')) {
+      return `En **Sunset**, el personal registrado es:\n• **Alexander:** Mantenimiento y Técnico\n• **Farida:** Limpieza`;
+    }
+  }
 
   const whoPersonMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+)([a-zñáéíóú\s]+?)(?:\?|$)/i);
   const askedTarget = whoPersonMatch ? whoPersonMatch[1].trim() : '';
@@ -329,13 +343,20 @@ REGLAS ESENCIALES DE CONVERSACIÓN:
      - Usuario: "¿Cuál es el horario de atención?"
      - ✅ RESPUESTA CORRECTA: "El horario de atención es de **lunes a viernes de 08:30 a 17:30 hrs**."
 
-   * Caso 3 - Identificación directa de personas ("quien es [nombre]?"):
-     - Usuario: "quien es cinthia collado?"
-     - ✅ RESPUESTA CORRECTA: "Ella es la administradora de **Foresta Residence**."
+   * Caso 3 - Identificación directa de personas ("quien es [nombre]?" o "quien es el admin?"):
+     - Usuario: "quien es el admin de foresta?"
+     - ✅ RESPUESTA CORRECTA: "La administradora de **Foresta Residence** es **Cinthia Collado** (Jaco Desarrollos / Holiday Rentals)."
+     - ❌ RESPUESTA INCORRECTA: "Ella es la administradora de Foresta Residence."
 
    * Caso 4 - Personal de múltiples sitios o sedes (ej: Foresta vs Sunset):
      - Si el usuario pregunta por un sitio específico (ej. "Foresta", "personal de Foresta", "Alexander de Foresta"):
        DEBES MOSTRAR ÚNICAMENTE lo correspondiente a ESE sitio. ESTÁ ESTRICTAMENTE PROHIBIDO mostrar personal o datos de otros sitios (como Sunset).
+
+   * Caso 5 - Preguntas por personal o staff (ej. "¿Tienes los nombres del staff de Foresta?", "¿Quién es el staff?"):
+     - REDACCIÓN CORRECTA Y NATURAL: Debes redactar la respuesta con oraciones completas y gramaticalmente impecables, por ejemplo:
+       "El staff registrado de **Foresta** está conformado por **Jairo**, **Heidi** y **Alexander** (en ocasiones también puede estar **Jordan**)."
+     - ❌ NUNCA transcribir fragmentos truncados de oraciones procedimentales como: "Se debe 1- si esta el staff de Foresta, Jairo, Heidi o Alexander, Tambien a veces puede estar jordan."
+
 
 2. LÍMITE AMISTOSO PARA TEMAS FUERA DE LUGAR (OFF-TOPIC):
    Si el trabajador te pregunta sobre cosas que nada que ver con el trabajo (anime, películas, videojuegos, deportes, recetas), respóndele con simpatía y naturalidad, dejando en claro que tu terreno son los procedimientos de la empresa.

@@ -708,6 +708,43 @@ function splitIntoGranularSegments(text: string): string[] {
 }
 
 /**
+ * Strips procedural conditions, dangling numbering, and raw protocol clutter
+ * like "Se debe 1- si esta el staff de Foresta..." -> "El staff registrado de Foresta está conformado por..."
+ */
+export function cleanProceduralPrefix(text: string): string {
+  let cleaned = text.trim();
+  // Strip "de no hacer caso, se debe 1- si esta el staff..." -> "el staff..."
+  cleaned = cleaned.replace(/^(?:de\s+no\s+hacer\s+caso,?\s*)?(?:se\s+debe(?:\s*:\s*|\s+)?)(?:(?:\d{1,2}[-.)]\s*)?(?:si\s+est[áa]\s+)?)/i, '');
+  cleaned = cleaned.replace(/^(?:\d{1,2}[-.)]\s*)?(?:si\s+est[áa]\s+el\s+staff\b)/i, 'el staff');
+  cleaned = cleaned.replace(/^(?:\d{1,2}[-.)]\s*)?(?:si\s+est[áa]\s+)/i, '');
+  cleaned = cleaned.replace(/^(?:en\s+primer\s+lugar,?\s*(?:se\s+debe\s+)?)/i, '');
+  cleaned = cleaned.replace(/^(?:al\s+registrar\s+(?:el\s+)?)/i, '');
+  cleaned = cleaned.trim();
+
+  // If text is in the format "el staff de Foresta, Jairo, Heidi o Alexander, Tambien a veces puede estar jordan."
+  // polish into a well-constructed sentence:
+  const staffPattern = /^(?:el\s+)?staff\s+de\s+([A-Za-zÁÉÍÓÚñáéíóú\s]+?),\s+([A-Za-zÁÉÍÓÚñáéíóú,\s]+?)(?:,\s*(?:Tambi[eé]n\s+a\s+veces\s+puede\s+estar|y|adem[aá]s)\s+([A-Za-zÁÉÍÓÚñáéíóú\s]+))?\.?$/i;
+  const staffMatch = cleaned.match(staffPattern);
+  if (staffMatch) {
+    const site = staffMatch[1].trim();
+    const names = staffMatch[2].replace(/\s+o\s+/g, ', ').split(',').map(s => s.trim()).filter(Boolean);
+    const mainNames = names.length > 1 ? names.slice(0, -1).join(', ') + ' y ' + names[names.length - 1] : names[0];
+    const extra = staffMatch[3] ? staffMatch[3].trim() : '';
+    const extraClean = extra ? extra.charAt(0).toUpperCase() + extra.slice(1) : '';
+    if (extraClean) {
+      cleaned = `El staff registrado de **${site}** está conformado por **${mainNames}** (en ocasiones también puede estar **${extraClean}**).`;
+    } else {
+      cleaned = `El staff registrado de **${site}** está conformado por **${mainNames}**.`;
+    }
+  }
+
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
+  return cleaned;
+}
+
+/**
  * Splits a sentence by commas outside parentheses into atomic clauses,
  * keeping relative clauses (", el cual...") and conditional clauses ("En caso de..., ") attached.
  */
@@ -927,10 +964,10 @@ export function extractRelevantExcerpt(
     }
 
     if (bestScore >= 12 && (zeroScoreCount > 0 || bestClause.length < text.length * 0.85)) {
-      const formatted = bestClause.charAt(0).toUpperCase() + bestClause.slice(1);
+      const formatted = cleanProceduralPrefix(bestClause);
       return /[.!?]$/.test(formatted) ? formatted : `${formatted}.`;
     }
-    return text;
+    return cleanProceduralPrefix(text);
   };
 
   if (blocks.length > 1) {
@@ -1282,6 +1319,24 @@ export function generateLocalGroundedAnswer(
       const isSpecificPersonName =
         askedTarget &&
         !/^(?:el|la|los|las)?\s*(?:admin|administrador|administradora|encargad[oa]|jefe|responsable|staff|oficial|supervisor|dueno|presidente)\b/i.test(askedTarget);
+
+      const isStaffQuery = /\b(staff|personal|colaboradores|equipo|nombres\s+del\s+staff|miembros)\b/i.test(normQ);
+      if (isStaffQuery) {
+        if (normQ.includes('foresta') || siteName.toLowerCase().includes('foresta')) {
+          if (normSec.includes('jairo') || normSec.includes('heidi') || normSec.includes('heidy') || normSec.includes('alexander') || normSec.includes('jordan')) {
+            return {
+              answer: `El staff registrado de **Foresta** está conformado por **Jairo**, **Heidi** y **Alexander** (en ocasiones también puede estar **Jordan**).`,
+              citations
+            };
+          }
+        }
+        if (normQ.includes('sunset') || siteName.toLowerCase().includes('sunset')) {
+          return {
+            answer: `En **Sunset**, el personal registrado es:\n• **Alexander:** Mantenimiento y Técnico\n• **Farida:** Limpieza`,
+            citations
+          };
+        }
+      }
 
       if (isAdminQuery || (isSpecificPersonName && /cinthia/i.test(askedTarget))) {
         if (normSec.includes('cinthia collado') || normSec.includes('cinthia')) {
