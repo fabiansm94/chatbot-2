@@ -8,7 +8,9 @@ import {
   FileUp,
   AlertCircle,
   Loader2,
-  FileCheck2
+  FileCheck2,
+  Send,
+  ShieldCheck
 } from 'lucide-react';
 import { KnowledgeProposal, ManualDocument } from '../types/manual';
 import { createProposal } from '../utils/approvalWorkflow';
@@ -248,6 +250,13 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
       {/* Body Form filling the entire chat container */}
       <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
+          <div className="p-3 rounded-xl bg-[#262835] border border-[#3e4153] text-xs text-slate-200 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-[#ca4048] shrink-0 mt-0.5" />
+            <span>
+              <strong className="text-white">Requiere aprobación del administrador (Fabian):</strong> Esta enseñanza no se guardará inmediatamente. Se enviará como propuesta pendiente y solo se incorporará a AI-zen cuando <strong className="text-white">Fabian</strong> la acepte.
+            </span>
+          </div>
+
           {error && (
             <div className="p-3.5 rounded-xl bg-[#ca4048]/20 border border-[#ca4048]/50 text-xs text-white flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-[#ca4048] shrink-0 mt-0.5" />
@@ -381,22 +390,27 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
         </div>
 
         {/* Footer Buttons anchored at bottom of chat */}
-        <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-[#262835] border-t border-[#3e4153] flex items-center justify-end gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={handleClose}
-            className="px-4 py-2 rounded-xl bg-[#2f3140] hover:bg-[#3e4153] text-slate-200 text-xs font-medium transition-colors border border-[#3e4153] cursor-pointer"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={isUploading}
-            className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] disabled:opacity-50 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
-          >
-            <Check className="w-4 h-4" />
-            <span>Guardar y Enviar</span>
-          </button>
+        <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-[#262835] border-t border-[#3e4153] flex items-center justify-between gap-3 shrink-0 flex-wrap">
+          <span className="text-[11px] text-amber-300 font-medium">
+            ⏳ Estado al enviar: Pendiente de aprobación por Fabian
+          </span>
+          <div className="flex items-center gap-2.5 ml-auto">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 rounded-xl bg-[#2f3140] hover:bg-[#3e4153] text-slate-200 text-xs font-medium transition-colors border border-[#3e4153] cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isUploading}
+              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] disabled:opacity-50 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Enviar para Aprobación</span>
+            </button>
+          </div>
         </div>
       </form>
     </div>

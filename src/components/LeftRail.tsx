@@ -3,11 +3,11 @@ import {
   MessageCircle,
   BookOpen,
   Search,
-  Star,
+  ShieldCheck,
   Globe,
   Settings
 } from 'lucide-react';
-import { USER_PROFILE, getUserProfile, RenderAvatar } from '../data/avatars';
+import { getUserProfile } from '../data/avatars';
 
 interface LeftRailProps {
   activeTab: 'chat' | 'book' | 'explorer' | 'approvals' | 'embed' | 'settings';
@@ -32,7 +32,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
       <div className="flex flex-col items-center gap-6">
         <div
           className="relative cursor-pointer group"
-          title={isFabian ? "Tu perfil de colaborador" : "Perfil de operador"}
+          title={isFabian ? "Tu perfil de administrador (Fabian)" : "Perfil de operador"}
           onClick={() => isFabian && setActiveTab('settings')}
         >
           <div className="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-pink-400 to-rose-600 ring-2 ring-white/70 shadow-lg group-hover:scale-105 transition-all flex items-center justify-center text-white font-bold text-xs uppercase">
@@ -46,7 +46,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('chat')}
-            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all ${
+            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all cursor-pointer ${
               activeTab === 'chat'
                 ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
                 : 'text-white/80 hover:text-white hover:bg-white/15'
@@ -63,7 +63,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('book')}
-                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer ${
                   activeTab === 'book'
                     ? 'bg-white text-[#ca4048] shadow-md shadow-black/20 scale-105'
                     : 'text-white/80 hover:text-white hover:bg-white/15'
@@ -78,7 +78,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('explorer')}
-                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all ${
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all cursor-pointer ${
                   activeTab === 'explorer'
                     ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
                     : 'text-white/80 hover:text-white hover:bg-white/15'
@@ -89,11 +89,31 @@ export const LeftRail: React.FC<LeftRailProps> = ({
                 <Search className="w-5 h-5 stroke-[2.2]" />
               </button>
 
+              {/* Approvals Tab (Fabian only) */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('approvals')}
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all relative cursor-pointer ${
+                  activeTab === 'approvals'
+                    ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
+                    : 'text-white/80 hover:text-white hover:bg-white/15'
+                }`}
+                title="Aprobación de Enseñanzas (Solo Fabian)"
+                aria-label="Aprobaciones"
+              >
+                <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
+                {pendingApprovalsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-400 text-slate-950 font-extrabold text-[10px] rounded-full flex items-center justify-center shadow-md">
+                    {pendingApprovalsCount}
+                  </span>
+                )}
+              </button>
+
               {/* Embed / Integration Tab */}
               <button
                 type="button"
                 onClick={() => setActiveTab('embed')}
-                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all ${
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all cursor-pointer ${
                   activeTab === 'embed'
                     ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
                     : 'text-white/80 hover:text-white hover:bg-white/15'
@@ -114,18 +134,20 @@ export const LeftRail: React.FC<LeftRailProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
-            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all relative ${
+            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[18px] flex items-center justify-center transition-all relative cursor-pointer ${
               activeTab === 'settings'
                 ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
                 : 'text-white/80 hover:text-white hover:bg-white/15'
             }`}
-            title="Configuración y Aprobaciones"
+            title="Configuración y Usuarios"
             aria-label="Configuración"
           >
             <Settings className="w-5 h-5 stroke-[2.2]" />
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-[#b82733] font-bold text-[10px] rounded-full flex items-center justify-center shadow-md">
-              {pendingApprovalsCount > 0 ? pendingApprovalsCount : '2'}
-            </span>
+            {pendingApprovalsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-[#b82733] font-bold text-[10px] rounded-full flex items-center justify-center shadow-md">
+                {pendingApprovalsCount}
+              </span>
+            )}
           </button>
         )}
       </div>

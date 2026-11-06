@@ -274,16 +274,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <span>AI-zen disponible ahora</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-[#b82733] tracking-tight leading-tight mb-3">
-              ¡Hola{loggedUserName && !isEmbedMode ? `, ${loggedUserName}` : ''}! Soy AI-zen 👋
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#b82733] tracking-tight leading-tight mb-3">
+              AI-zen
             </h1>
 
-            <p className="text-sm sm:text-lg font-medium text-slate-600 max-w-md leading-relaxed">
-              Estoy aquí para ayudarte con turnos, sedes, personal autorizado, protocolos y manuales de <span className="font-bold text-slate-800">STS Security</span>.
-            </p>
-
-            <p className="text-xs sm:text-sm text-rose-500/80 font-semibold mt-4">
-              Escribe tu consulta abajo para comenzar 👇
+            <p className="text-sm sm:text-base font-medium text-slate-700 max-w-lg leading-relaxed italic">
+              "En este sistema no existen interpretaciones ni suposiciones; solo existen datos y flujos lógicos. A menudo, los usuarios distorsionan los pasos tratando de forzar un resultado conveniente, perdiéndose en el proceso. Mi función es devolverte a los hechos objetivos. Permíteme guiarte por el procedimiento correcto."
             </p>
           </div>
         ) : (

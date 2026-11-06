@@ -146,22 +146,25 @@ export default function App() {
         setManuals(prev => prev.filter(m => !deletedIds.includes(m.id)));
       });
 
-    // 2. Load Proposals
-    getDocs(collection(db, 'proposals'))
-      .then(snapshot => {
+    // 2. Load Proposals in real time so Fabian sees any new teachings immediately
+    const unsubscribeProposals = onSnapshot(
+      collection(db, 'proposals'),
+      snapshot => {
         if (!snapshot.empty) {
           const loadedProps: KnowledgeProposal[] = [];
           snapshot.forEach(docSnap => {
             loadedProps.push(docSnap.data() as KnowledgeProposal);
           });
+          loadedProps.sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
           setProposals(loadedProps);
         } else {
           DEFAULT_PROPOSALS.forEach(p => {
             setDoc(doc(db, 'proposals', p.id), p).catch(console.warn);
           });
         }
-      })
-      .catch(err => console.warn('Error loading proposals from Firestore:', err));
+      },
+      err => console.warn('Error loading proposals from Firestore:', err)
+    );
 
     // 3. Start current-user chat fresh on session load so the large AI-zen greeting is displayed
     setThreads(DEFAULT_USER_THREADS);
@@ -175,6 +178,10 @@ export default function App() {
         }
       })
       .catch(err => console.warn('Could not contact /api/status:', err));
+
+    return () => {
+      unsubscribeProposals();
+    };
   }, []);
 
   useEffect(() => {
@@ -422,25 +429,36 @@ export default function App() {
   };
 
   const handleSubmitProposal = (newProp: KnowledgeProposal) => {
-    setProposals(prev => [newProp, ...prev]);
+    setProposals(prev => [newProp, ...prev.filter(p => p.id !== newProp.id)]);
     setDoc(doc(db, 'proposals', newProp.id), newProp).catch(console.warn);
-    showToast('¡Propuesta enviada con éxito! Está en el Buzón de Aprobaciones.');
+    showToast('Enseñanza enviada. Pendiente de aprobación por el administrador Fabian.');
   };
 
-  const handleApproveProposal = (prop: KnowledgeProposal, approverName: string) => {
-    const { updatedManuals, approvedProposal } = approveProposal(prop, manuals, approverName);
+  const handleApproveProposal = (prop: KnowledgeProposal, _approverName?: string) => {
+    if (!isFabian) {
+      showToast('Solo el administrador Fabian puede aceptar enseñanzas.');
+      return;
+    }
+    const { updatedManuals, approvedProposal } = approveProposal(prop, manuals, 'Fabian');
     setManuals(updatedManuals);
     setProposals(prev => prev.map(p => (p.id === prop.id ? approvedProposal : p)));
-    setDoc(doc(db, 'manuals', approvedProposal.id || 'man-prop-' + Date.now()), updatedManuals[0]).catch(console.warn);
+    const createdOrUpdatedManual = updatedManuals[0];
+    if (createdOrUpdatedManual) {
+      setDoc(doc(db, 'manuals', createdOrUpdatedManual.id), createdOrUpdatedManual).catch(console.warn);
+    }
     setDoc(doc(db, 'proposals', prop.id), approvedProposal).catch(console.warn);
-    showToast(`¡Aprobado! El procedimiento "${prop.title}" ha sido incorporado al Book oficial.`);
+    showToast(`¡Aceptado por Fabian! El manual "${prop.title}" ha sido incorporado.`);
   };
 
-  const handleRejectProposal = (prop: KnowledgeProposal, reason: string, approverName: string) => {
-    const rejected = rejectProposal(prop, reason, approverName);
+  const handleRejectProposal = (prop: KnowledgeProposal, reason: string, _approverName?: string) => {
+    if (!isFabian) {
+      showToast('Solo el administrador Fabian puede rechazar enseñanzas.');
+      return;
+    }
+    const rejected = rejectProposal(prop, reason, 'Fabian');
     setProposals(prev => prev.map(p => (p.id === prop.id ? rejected : p)));
     setDoc(doc(db, 'proposals', prop.id), rejected).catch(console.warn);
-    showToast(`Procedimiento rechazado.`);
+    showToast('Enseñanza rechazada por Fabian.');
   };
 
   const pendingApprovalsCount = proposals.filter(p => p.status === 'pending').length;
