@@ -9,6 +9,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { KnowledgeProposal } from '../types/manual';
+import { FormattedContent } from './FormattedContent';
 
 interface ApprovalsViewProps {
   proposals: KnowledgeProposal[];
@@ -208,8 +209,8 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
               </div>
 
               {/* Procedure Content */}
-              <div className="p-4 rounded-xl bg-[#2f3140] border border-[#3e4153] text-xs text-slate-200 whitespace-pre-line leading-relaxed font-sans">
-                {proposal.content}
+              <div className="p-4 rounded-xl bg-[#2f3140] border border-[#3e4153] text-xs text-slate-200 leading-relaxed font-sans">
+                <FormattedContent content={proposal.content} />
               </div>
 
               {/* Key points & tags */}

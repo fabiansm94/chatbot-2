@@ -14,9 +14,10 @@ import {
   LogOut,
   Sparkles
 } from 'lucide-react';
-import { ChatMessage, Citation, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
+import { ChatMessage, Citation, KnowledgeProposal, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
 import { FormattedContent } from './FormattedContent';
 import { RobotMascot } from './RobotMascot';
+import { ProposeKnowledgeModal } from './ProposeKnowledgeModal';
 
 interface ChatViewProps {
   threads: UserChatThread[];
@@ -30,6 +31,9 @@ interface ChatViewProps {
   hasGeminiKey: boolean;
   manuals: ManualDocument[];
   onOpenProposeModal?: () => void;
+  proposeModalOpen?: boolean;
+  onCloseProposeModal?: () => void;
+  onSubmitProposal?: (proposal: KnowledgeProposal) => void;
   onOpenSection?: (section: ManualSection, manual: ManualDocument) => void;
   loggedUserName?: string;
   onLogout?: () => void;
@@ -47,7 +51,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onSendMessage,
   onClearChat,
   onOpenCitation,
+  manuals,
   onOpenProposeModal,
+  proposeModalOpen,
+  onCloseProposeModal,
+  onSubmitProposal,
   loggedUserName,
   onLogout,
   viewMode = 'web',
@@ -59,8 +67,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackState, setFeedbackState] = useState<Record<string, 'up' | 'down'>>({});
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [internalProposeOpen, setInternalProposeOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isProposeOpen = proposeModalOpen !== undefined ? proposeModalOpen : internalProposeOpen;
+  const handleOpenPropose = () => {
+    if (onOpenProposeModal) {
+      onOpenProposeModal();
+    } else {
+      setInternalProposeOpen(true);
+    }
+  };
+  const handleClosePropose = () => {
+    if (onCloseProposeModal) {
+      onCloseProposeModal();
+    }
+    setInternalProposeOpen(false);
+  };
 
   // Sync if prop changes externally
   useEffect(() => {
@@ -107,7 +131,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   return (
     <div
-      className={`w-full h-full flex flex-col overflow-hidden transition-all duration-200 select-none ${
+      className={`relative w-full h-full flex flex-col overflow-hidden transition-all duration-200 select-none ${
         isEmbedMode
           ? 'w-full h-full bg-[#fff8f8]'
           : isPhone
@@ -115,6 +139,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
             : 'flex-1 w-full h-full bg-[#fff8f8]'
       }`}
     >
+      {/* Full-chat Enseñar al Bot View covering the entire chat shape */}
+      {isProposeOpen && onSubmitProposal && (
+        <ProposeKnowledgeModal
+          isOpen={isProposeOpen}
+          onClose={handleClosePropose}
+          onSubmitProposal={onSubmitProposal}
+          manuals={manuals}
+        />
+      )}
       {/* =========================================================================
           HEADER: Mascot, Title, User & Options (Clean layout matching reference)
           ========================================================================= */}
@@ -138,7 +171,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 relative shrink-0">
-          {loggedUserName && !isEmbedMode && (
+          {loggedUserName && (
             <span className="text-[11px] bg-white/15 px-2.5 py-1 rounded-full font-bold text-white shadow-2xs capitalize hidden md:inline-block">
               {loggedUserName}
             </span>
@@ -165,12 +198,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </span>
                 )}
               </div>
-              {onOpenProposeModal && (
+              {(onOpenProposeModal || onSubmitProposal) && (
                 <button
                   type="button"
                   onClick={() => {
                     setHeaderMenuOpen(false);
-                    onOpenProposeModal();
+                    handleOpenPropose();
                   }}
                   className="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 text-slate-700 hover:text-[#b82733] flex items-center gap-2 text-xs font-semibold transition-colors border-b border-rose-50 cursor-pointer"
                 >
@@ -208,14 +241,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <span>Limpiar Chat</span>
                 </button>
               )}
-              {onLogout && !isEmbedMode && (
+              {onLogout && (
                 <button
                   type="button"
                   onClick={() => {
                     setHeaderMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-[#b82733] flex items-center gap-2 border-t border-rose-100 text-xs font-semibold transition-colors cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 text-[#b82733] flex items-center gap-2 border-t border-rose-100 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5 text-[#b82733]" />
                   <span>Cerrar Sesión</span>

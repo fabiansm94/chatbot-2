@@ -1,7 +1,19 @@
-import React, { useState } from 'react';
-import { X, Sparkles, Send, ShieldAlert, Check, BookOpen, AlertCircle, User, Info } from 'lucide-react';
-import { KnowledgeProposal, ManualCategory, ManualDocument } from '../types/manual';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  X,
+  Plus,
+  Sparkles,
+  Check,
+  Upload,
+  FileUp,
+  AlertCircle,
+  Loader2,
+  FileCheck2
+} from 'lucide-react';
+import { KnowledgeProposal, ManualDocument } from '../types/manual';
 import { createProposal } from '../utils/approvalWorkflow';
+import { RichTextEditor } from './RichTextEditor';
+import { cleanRawHtmlTags, textOrHtmlToEditorHtml } from '../utils/textFormatting';
 
 interface ProposeKnowledgeModalProps {
   isOpen: boolean;
@@ -13,301 +25,380 @@ interface ProposeKnowledgeModalProps {
 export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
   isOpen,
   onClose,
-  onSubmitProposal,
-  manuals
+  onSubmitProposal
 }) => {
+  const [activeTab, setActiveTab] = useState<'upload' | 'manual'>('manual');
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<ManualCategory>('operaciones');
-  const [department, setDepartment] = useState('');
-  const [targetManualId, setTargetManualId] = useState<string>('');
-  const [content, setContent] = useState('');
-  const [tags, setTags] = useState('');
-  const [keyPoints, setKeyPoints] = useState('');
-  const [submittedBy, setSubmittedBy] = useState('');
-  const [reason, setReason] = useState('');
+  const [contentHtml, setContentHtml] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [fileSizeStr, setFileSizeStr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveTab('manual');
+    setTitle('');
+    setContentHtml('');
+    setUploadedFileName(null);
+    setFileSizeStr(null);
+    setError(null);
+    setIsUploading(false);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleApplyTemplate = (type: 'vpn' | 'salas' | 'taxi') => {
-    if (type === 'vpn') {
-      setTitle('Procedimiento de Solicitud de Acceso a VPN y Red Remota');
-      setCategory('ti');
-      setDepartment('Tecnologías de la Información');
-      setTargetManualId('man-ti-02');
-      setContent('1. Todo acceso a redes privadas corporativas desde el exterior debe tramitarse mediante ticket en el portal de TI.\n2. Es requisito previo tener el doble factor (2FA) configurado y el antivirus corporativo actualizado.\n3. El responsable directo del equipo debe validar la justificación en un plazo de 24 horas.');
-      setTags('vpn, acceso remoto, red, seguridad, ticket');
-      setKeyPoints('Ticket obligatorio en portal TI | Aprobación del líder en 24h | 2FA obligatorio');
-      setReason('Muchos empleados nuevos preguntan cómo conectarse fuera de la oficina.');
-      setSubmittedBy('Soporte de TI / Colaborador');
-    } else if (type === 'salas') {
-      setTitle('Pauta de Uso y Reserva de Salas de Reunión');
-      setCategory('operaciones');
-      setDepartment('Servicios Generales');
-      setContent('1. Las salas deben reservarse a través del calendario corporativo con al menos 24 horas de antelación.\n2. Al finalizar la reunión, se debe dejar la sala ordenada, apagar pantallas y liberar la reserva si se termina antes de tiempo.');
-      setTags('salas, reunion, calendario, reserva, orden');
-      setKeyPoints('Reserva con 24h de antelación | Liberación de sala si termina antes');
-      setReason('Evitar cruces y quejas por salas ocupadas sin reserva formal.');
-      setSubmittedBy('Recepción & Operaciones');
-    } else {
-      setTitle('Protocolo de Reembolso de Taxis Nocturnos');
-      setCategory('rrhh');
-      setDepartment('Gestión de Personas');
-      setTargetManualId('man-rrhh-01');
-      setContent('Las salidas de trabajo posteriores a las 21:30 hrs por requerimiento del proyecto cuentan con servicio de taxi seguro cubierto por la empresa a través de la cuenta corporativa.');
-      setTags('taxi, transporte, noche, seguridad, reembolso');
-      setKeyPoints('Aplica después de las 21:30 hrs | Cargo directo a cuenta corporativa');
-      setReason('Garantizar la seguridad física de los empleados en turnos nocturnos.');
-      setSubmittedBy('Comité de Bienestar');
+  const resetForm = () => {
+    setTitle('');
+    setContentHtml('');
+    setUploadedFileName(null);
+    setFileSizeStr(null);
+    setError(null);
+    setIsUploading(false);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleFileSelected = async (file: File) => {
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!['.pdf', '.docx', '.doc'].includes(ext)) {
+      setError('Formato no soportado. Por favor sube un archivo PDF (.pdf) o Word (.docx, .doc).');
+      return;
+    }
+
+    setUploadedFileName(file.name);
+    setFileSizeStr(formatFileSize(file.size));
+    setError(null);
+    setIsUploading(true);
+    setUploadProgress('Leyendo y transcribiendo el documento...');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const resultStr = reader.result as string;
+          const base64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr;
+
+          setUploadProgress('Transcribiendo texto y aplicando formato enriquecido...');
+
+          const response = await fetch('/api/parse-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: file.name,
+              fileBase64: base64,
+              mimeType: file.type
+            })
+          });
+
+          const data = await response.json();
+          if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Error al procesar el archivo');
+          }
+
+          const parsed = data.manual as ManualDocument;
+          setTitle(parsed.title || file.name.replace(/\.[^/.]+$/, ''));
+
+          const transcribed =
+            data.contentHtml ||
+            textOrHtmlToEditorHtml(
+              data.fullText ||
+                (parsed.sections ? parsed.sections.map(s => s.content).join('\n\n') : parsed.summary || '')
+            );
+
+          setContentHtml(transcribed);
+          setIsUploading(false);
+        } catch (serverErr: any) {
+          setIsUploading(false);
+          setError(serverErr.message || 'No se pudo transcribir el archivo en el servidor.');
+        }
+      };
+
+      reader.onerror = () => {
+        setIsUploading(false);
+        setError('Error al leer el archivo en el navegador.');
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setIsUploading(false);
+      setError(err.message || 'Error inesperado al cargar el archivo.');
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelected(e.dataTransfer.files[0]);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim() || !submittedBy.trim()) {
-      setError('Por favor completa el título, contenido y tu nombre o departamento.');
+
+    if (!title.trim()) {
+      setError('Por favor indica el título del manual o procedimiento.');
       return;
     }
 
+    const plainTextContent = cleanRawHtmlTags(contentHtml);
+    if (!plainTextContent.trim()) {
+      setError('Por favor ingresa la información o descripción del manual.');
+      return;
+    }
+
+    const loggedUser =
+      (typeof window !== 'undefined' && localStorage.getItem('manualbot_logged_user_name_v1')) ||
+      'Colaborador';
+
     const newProposal = createProposal({
-      title,
-      category,
-      department: department.trim() || 'General',
-      content,
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      keyPoints: keyPoints ? keyPoints.split('|').map(p => p.trim()).filter(Boolean) : undefined,
-      submittedBy,
-      reason: reason.trim() || 'Propuesta de mejora interna',
-      targetManualId: targetManualId || undefined
+      title: title.trim(),
+      category: 'general',
+      department: 'Control y Monitoreo',
+      content: plainTextContent,
+      tags: ['manual', 'oficial'],
+      submittedBy: loggedUser,
+      reason: 'Propuesta desde Enseñar al Bot'
     });
 
     onSubmitProposal(newProposal);
-    onClose();
+    handleClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-[#2f3140] border border-[#3e4153] rounded-3xl shadow-2xl overflow-hidden my-8 text-white">
-        {/* Header */}
-        <div className="p-5 border-b border-[#3e4153] bg-[#262835] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-[#ca4048]/20 text-[#ca4048]">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">Enseñar un Nuevo Procedimiento al Asistente</h2>
-              <p className="text-xs text-slate-300">Propón un nuevo procedimiento o política para que tus compañeros puedan consultarlo</p>
-            </div>
+    <div className="absolute inset-0 z-40 w-full h-full bg-[#2f3140] text-white flex flex-col overflow-hidden animate-fade-in select-text">
+      {/* Header */}
+      <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-[#3e4153] bg-[#262835] flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2 rounded-xl bg-[#ca4048]/20 text-[#ca4048] border border-[#ca4048]/30 shrink-0">
+            <Sparkles className="w-5 h-5" />
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-[#3e4153]"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-bold text-white truncate">
+              Enseñar al Bot (Nuevo Manual o Procedimiento)
+            </h2>
+            <p className="text-[11px] sm:text-xs text-slate-300 truncate">
+              Sube un archivo para transcribirlo o redáctalo con formato en tiempo real
+            </p>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#3e4153] transition-colors cursor-pointer shrink-0"
+          title="Volver al chat"
+          aria-label="Cerrar y volver al chat"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-        {/* Warning Banner: Requires Admin Approval */}
-        <div className="p-3.5 bg-[#262835] border-b border-[#3e4153] text-xs text-slate-200 flex items-start gap-2.5">
-          <Info className="w-4 h-4 text-[#ca4048] shrink-0 mt-0.5" />
-          <span>
-            <strong className="text-white">Control de Calidad y Aprobación:</strong> La información no se guardará en el Asistente automáticamente. Tu propuesta pasará primero al <strong className="text-white">Buzón de Aprobaciones del Administrador</strong>. Una vez revisada y autorizada por ti o tu supervisor, el bot la incorporará a sus respuestas oficiales.
-          </span>
-        </div>
+      {/* Tab Selection */}
+      <div className="px-4 sm:px-6 pt-2.5 pb-0 bg-[#262835] border-b border-[#3e4153] flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTab('upload')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 text-xs font-semibold rounded-t-xl transition-all border-b-2 cursor-pointer ${
+            activeTab === 'upload'
+              ? 'border-[#ca4048] text-white bg-[#2f3140]'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <FileUp className="w-4 h-4 text-[#ca4048] shrink-0" />
+          <span>Subir Archivo (PDF / Word)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('manual')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 text-xs font-semibold rounded-t-xl transition-all border-b-2 cursor-pointer ${
+            activeTab === 'manual'
+              ? 'border-[#ca4048] text-white bg-[#2f3140]'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Plus className="w-4 h-4 shrink-0" />
+          <span>Crear Manualmente</span>
+        </button>
+      </div>
 
-        {/* Templates quick selector */}
-        <div className="p-3.5 bg-[#262835] border-b border-[#3e4153] flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-300 font-medium">Ejemplos Rápidos:</span>
-          <button
-            type="button"
-            onClick={() => handleApplyTemplate('vpn')}
-            className="text-xs px-2.5 py-1 rounded-lg bg-[#2f3140] text-white hover:bg-[#ca4048]/20 border border-[#3e4153] transition-colors"
-          >
-            Acceso a VPN
-          </button>
-          <button
-            type="button"
-            onClick={() => handleApplyTemplate('salas')}
-            className="text-xs px-2.5 py-1 rounded-lg bg-[#2f3140] text-white hover:bg-[#ca4048]/20 border border-[#3e4153] transition-colors"
-          >
-            Reserva de Salas
-          </button>
-          <button
-            type="button"
-            onClick={() => handleApplyTemplate('taxi')}
-            className="text-xs px-2.5 py-1 rounded-lg bg-[#2f3140] text-white hover:bg-[#ca4048]/20 border border-[#3e4153] transition-colors"
-          >
-            Taxis Nocturnos
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+      {/* Body Form filling the entire chat container */}
+      <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
           {error && (
-            <div className="p-3 rounded-xl bg-[#ca4048]/20 border border-[#ca4048]/50 text-xs text-white">
-              {error}
+            <div className="p-3.5 rounded-xl bg-[#ca4048]/20 border border-[#ca4048]/50 text-xs text-white flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-[#ca4048] shrink-0 mt-0.5" />
+              <div>{error}</div>
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {activeTab === 'upload' && (
+            <div className="space-y-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                className="hidden"
+                onChange={e => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileSelected(e.target.files[0]);
+                  }
+                }}
+              />
+
+              {!uploadedFileName && !isUploading && (
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-5 sm:p-6 text-center cursor-pointer transition-all ${
+                    isDragging
+                      ? 'border-[#ca4048] bg-[#ca4048]/10 scale-[1.01]'
+                      : 'border-[#3e4153] hover:border-[#ca4048]/60 bg-[#262835]/50 hover:bg-[#262835]'
+                  }`}
+                >
+                  <div className="w-11 h-11 mx-auto mb-2 rounded-2xl bg-[#ca4048]/15 border border-[#ca4048]/30 flex items-center justify-center text-[#ca4048]">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-bold text-white mb-1">
+                    Arrastra tu archivo PDF o Word aquí o haz clic para seleccionarlo
+                  </h3>
+                  <p className="text-xs text-slate-300 max-w-md mx-auto mb-3 leading-relaxed">
+                    El sistema leerá el archivo y lo transcribirá en el editor de abajo con su formato y listas para que puedas editarlo directamente.
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-[#ca4048]/20 text-[#ca4048] font-mono text-[11px] font-semibold border border-[#ca4048]/30">
+                      PDF (.pdf)
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-400 font-mono text-[11px] font-semibold border border-sky-500/30">
+                      Word (.docx / .doc)
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {isUploading && (
+                <div className="rounded-2xl bg-[#262835] border border-[#3e4153] p-5 text-center space-y-3">
+                  <div className="w-10 h-10 mx-auto rounded-full bg-[#ca4048]/20 flex items-center justify-center text-[#ca4048]">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Transcribiendo {uploadedFileName}</h4>
+                    <p className="text-xs text-slate-300 mt-1">{uploadProgress}</p>
+                  </div>
+                </div>
+              )}
+
+              {uploadedFileName && !isUploading && (
+                <div className="p-3 rounded-xl bg-[#262835] border border-[#3e4153] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-2 rounded-lg bg-[#ca4048]/20 text-[#ca4048] border border-[#ca4048]/30 shrink-0">
+                      <FileCheck2 className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white truncate max-w-[180px] sm:max-w-md">
+                          {uploadedFileName}
+                        </span>
+                        {fileSizeStr && (
+                          <span className="text-[11px] text-slate-400 font-mono">({fileSizeStr})</span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-emerald-400 font-medium block mt-0.5">
+                        ✓ Archivo transcrito al editor — puedes editar el texto abajo
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#2f3140] hover:bg-[#3e4153] text-xs font-medium text-slate-200 border border-[#3e4153] transition-colors shrink-0 cursor-pointer"
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Unified Fields for both Upload and Manual Creation */}
+          <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-200 mb-1">
-                Título del Procedimiento o Regla *
+              <label className="block text-xs font-semibold text-slate-200 mb-1.5">
+                Título del Manual / Procedimiento *
               </label>
               <input
                 type="text"
                 required
-                placeholder="Ej. Protocolo de Reserva de Salas de Reunión"
+                placeholder="Ej. Procedimiento de Control Foresta Residence"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#262835] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#262835] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-200 mb-1">
-                Tu Nombre o Departamento *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Juan Pérez (Operaciones) / TI"
-                value={submittedBy}
-                onChange={e => setSubmittedBy(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#262835] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
+              <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Información del Manual / Descripción *
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  Editor en tiempo real (Listas • puntos, 1,2,3 y a,b,c)
+                </span>
+              </div>
+              <RichTextEditor
+                content={contentHtml}
+                onChange={setContentHtml}
+                placeholder="Escribe o edita aquí toda la información del manual. Puedes usar listas con puntos (•), listas numeradas (1, 2, 3), listas alfabéticas (a, b, c), títulos y negritas..."
               />
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-200 mb-1">
-                Categoría
-              </label>
-              <select
-                value={category}
-                onChange={e => setCategory(e.target.value as ManualCategory)}
-                className="w-full px-3 py-2 rounded-xl bg-[#262835] border border-[#3e4153] text-xs text-white focus:outline-none focus:border-[#ca4048]"
-              >
-                <option value="operaciones">Operaciones & Procesos</option>
-                <option value="rrhh">RRHH & Beneficios</option>
-                <option value="ti">TI & Ciberseguridad</option>
-                <option value="seguridad">Seguridad & SST</option>
-                <option value="legal_etica">Legal & Ética</option>
-                <option value="general">General</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-200 mb-1">
-                Departamento Responsable
-              </label>
-              <input
-                type="text"
-                placeholder="Ej. Soporte al Empleado"
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#262835] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-200 mb-1">
-                Vincular a Manual Existente
-              </label>
-              <select
-                value={targetManualId}
-                onChange={e => setTargetManualId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#262835] border border-[#3e4153] text-xs text-white focus:outline-none focus:border-[#ca4048]"
-              >
-                <option value="">Crear nuevo documento</option>
-                {manuals.map(m => (
-                  <option key={m.id} value={m.id} className="bg-[#262835] text-white">
-                    {m.code} - {m.title.slice(0, 25)}...
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-200 mb-1">
-              Contenido Oficial del Procedimiento o Respuesta *
-            </label>
-            <textarea
-              rows={4}
-              required
-              placeholder="Explica detalladamente los pasos, requisitos, plazos y directrices que el Asistente debe responder a los trabajadores..."
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-[#262835] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048] leading-relaxed font-sans"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div>
-              <label className="block text-[11px] text-slate-300 mb-0.5 font-medium">
-                Puntos Clave / Resumen (separados por |)
-              </label>
-              <input
-                type="text"
-                placeholder="Paso 1 | Paso 2 | Plazo máx"
-                value={keyPoints}
-                onChange={e => setKeyPoints(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg bg-[#262835] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-300 mb-0.5 font-medium">
-                Palabras clave de búsqueda (separadas por comas)
-              </label>
-              <input
-                type="text"
-                placeholder="sala, reserva, meeting"
-                value={tags}
-                onChange={e => setTags(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg bg-[#262835] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-200 mb-1">
-              ¿Por qué se propone esta información? (Para el Administrador)
-            </label>
-            <input
-              type="text"
-              placeholder="Ej. Cambio de política la semana pasada / Pregunta recurrente en el equipo"
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-[#262835] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
-            />
-          </div>
-
-          {/* Footer Submit */}
-          <div className="pt-4 border-t border-[#3e4153] flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">
-              Estado inicial: ⏳ Pendiente de Aprobación
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-[#3e4153] transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] text-white text-xs font-semibold shadow-md shadow-[#ca4048]/30 transition-all"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Enviar para Aprobación</span>
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
+        {/* Footer Buttons anchored at bottom of chat */}
+        <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-[#262835] border-t border-[#3e4153] flex items-center justify-end gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="px-4 py-2 rounded-xl bg-[#2f3140] hover:bg-[#3e4153] text-slate-200 text-xs font-medium transition-colors border border-[#3e4153] cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={isUploading}
+            className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] disabled:opacity-50 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+          >
+            <Check className="w-4 h-4" />
+            <span>Guardar y Enviar</span>
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

@@ -458,7 +458,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-screen max-h-screen bg-[#fff8f8] text-slate-800 flex overflow-hidden font-sans antialiased">
+    <div className="relative w-full h-screen max-h-screen bg-[#fff8f8] text-slate-800 flex overflow-hidden font-sans antialiased">
       {showLoginModal && <LoginModal onLogin={handleLogin} />}
 
       <div className="w-full h-full flex overflow-hidden">
@@ -472,7 +472,7 @@ export default function App() {
           />
         )}
 
-        <main className={`flex-1 flex overflow-hidden min-w-0 min-h-0 h-full ${activeTab === 'chat' ? 'bg-[#f8e8e9]' : 'bg-[#262835] text-white'}`}>
+        <main className={`relative flex-1 flex overflow-hidden min-w-0 min-h-0 h-full ${activeTab === 'chat' ? 'bg-[#f8e8e9]' : 'bg-[#262835] text-white'}`}>
           {activeTab === 'chat' && (
             <div className="flex-1 flex w-full h-full overflow-hidden items-center justify-center">
               <ChatView
@@ -487,6 +487,9 @@ export default function App() {
                 hasGeminiKey={hasGeminiKey}
                 manuals={manuals}
                 onOpenProposeModal={() => setProposeModalOpen(true)}
+                proposeModalOpen={proposeModalOpen}
+                onCloseProposeModal={() => setProposeModalOpen(false)}
+                onSubmitProposal={handleSubmitProposal}
                 onOpenSection={handleOpenSection}
                 loggedUserName={loggedUserName}
                 onLogout={handleLogout}
@@ -558,6 +561,15 @@ export default function App() {
               onOpenProposeModal={() => setProposeModalOpen(true)}
             />
           )}
+
+          {activeTab !== 'chat' && proposeModalOpen && (
+            <ProposeKnowledgeModal
+              isOpen={proposeModalOpen}
+              onClose={() => setProposeModalOpen(false)}
+              onSubmitProposal={handleSubmitProposal}
+              manuals={manuals}
+            />
+          )}
         </main>
       </div>
 
@@ -581,13 +593,6 @@ export default function App() {
         editingManual={editingManual}
         initialFile={addModalInitialFile}
         defaultTab={addModalDefaultTab}
-      />
-
-      <ProposeKnowledgeModal
-        isOpen={proposeModalOpen}
-        onClose={() => setProposeModalOpen(false)}
-        onSubmitProposal={handleSubmitProposal}
-        manuals={manuals}
       />
 
       {toastMessage && (

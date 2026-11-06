@@ -21,7 +21,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#2f3140]/85 backdrop-blur-md p-4">
+    <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#2f3140]/85 backdrop-blur-md p-4">
       <form onSubmit={handleSubmit} className="bg-[#2f3140] p-8 rounded-3xl border border-[#3e4153] w-full max-w-sm space-y-6 shadow-2xl">
         <h2 className="text-2xl font-bold text-white text-center">Acceso STS Security</h2>
         

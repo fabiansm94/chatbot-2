@@ -4,7 +4,7 @@ import { db } from '../lib/firebase';
 import { ManualDocument, ManualSection, ChatMessage, Citation, UserChatThread, KnowledgeProposal } from '../types/manual';
 import { ChatView } from './ChatView';
 import { ManualDrawer } from './ManualDrawer';
-import { ProposeKnowledgeModal } from './ProposeKnowledgeModal';
+import { LoginModal } from './LoginModal';
 import { DEFAULT_MANUALS } from '../data/defaultManuals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from '../data/userChatThreads';
 import { searchManuals, generateLocalGroundedAnswer } from '../utils/manualSearch';
@@ -66,12 +66,30 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const [drawerSection, setDrawerSection] = useState<ManualSection | null>(null);
   const [proposeModalOpen, setProposeModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loggedUserName, setLoggedUserName] = useState<string>(() => {
+    return localStorage.getItem('manualbot_logged_user_name_v1') || '';
+  });
 
   useEffect(() => {
     try {
       localStorage.setItem('manualbot_widget_threads_v3', JSON.stringify(threads));
     } catch (e) {}
   }, [threads]);
+
+  const handleLogin = (_station: 'Estación 1' | 'Estación 2', userName: string) => {
+    setLoggedUserName(userName);
+    setShowLoginModal(false);
+    localStorage.setItem('manualbot_logged_user_name_v1', userName);
+    localStorage.setItem('manualbot_auth_v1', 'true');
+  };
+
+  const handleLogout = () => {
+    setLoggedUserName('');
+    setShowLoginModal(true);
+    localStorage.removeItem('manualbot_logged_user_name_v1');
+    localStorage.setItem('manualbot_auth_v1', 'false');
+  };
 
   const handleSubmitProposal = (newProp: KnowledgeProposal) => {
     setDoc(doc(db, 'proposals', newProp.id), newProp).catch(console.warn);
@@ -171,7 +189,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   return (
     <div className="w-full h-full bg-[#fff8f8] text-slate-800 flex flex-col overflow-hidden font-sans relative">
-      <main className="flex-1 flex flex-col overflow-hidden bg-[#fff8f8] w-full h-full">
+      {showLoginModal && <LoginModal onLogin={handleLogin} />}
+
+      <main className="flex-1 flex flex-col overflow-hidden bg-[#fff8f8] w-full h-full relative">
         <ChatView
           threads={threads}
           activeThreadId={activeThreadId}
@@ -184,7 +204,12 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           hasGeminiKey={hasGeminiKey}
           manuals={manuals}
           onOpenProposeModal={() => setProposeModalOpen(true)}
+          proposeModalOpen={proposeModalOpen}
+          onCloseProposeModal={() => setProposeModalOpen(false)}
+          onSubmitProposal={handleSubmitProposal}
           onOpenSection={handleOpenSection}
+          loggedUserName={loggedUserName}
+          onLogout={handleLogout}
           viewMode="phone"
           allowModeToggle={false}
           isEmbed={true}
@@ -200,13 +225,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           setDrawerOpen(false);
           handleSendMessage(`¿Qué requisitos, plazos o pasos debo tener en cuenta según el ${section.articleNumber} ("${section.title}") del ${manual.title}?`);
         }}
-      />
-
-      <ProposeKnowledgeModal
-        isOpen={proposeModalOpen}
-        onClose={() => setProposeModalOpen(false)}
-        onSubmitProposal={handleSubmitProposal}
-        manuals={manuals}
       />
 
       {toastMessage && (

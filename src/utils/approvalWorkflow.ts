@@ -89,14 +89,15 @@ export function approveProposal(
   // Otherwise, create a dedicated new approved procedure document in the Book
   const newManualDoc: ManualDocument = {
     id: `man-prop-${proposal.id}`,
-    title: `Procedimiento Oficial: ${proposal.title}`,
-    code: `PROC-${proposal.category.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-3)}`,
+    title: proposal.title,
+    code: `MAN-${Date.now().toString().slice(-4)}`,
     category: proposal.category,
-    version: '1.0 (Aprobado)',
+    version: '1.0',
     updatedDate: approvedAt.split(' ')[0],
-    summary: `Procedimiento propuesto por ${proposal.submittedBy} y aprobado por ${approverName}. Motivo: ${proposal.reason || 'Actualización de procesos'}.`,
+    summary: proposal.content,
+    description: proposal.content,
     department: proposal.department,
-    iconName: proposal.category === 'ti' ? 'Laptop' : proposal.category === 'seguridad' ? 'ShieldAlert' : proposal.category === 'legal_etica' ? 'Scale' : proposal.category === 'operaciones' ? 'Briefcase' : 'Users',
+    iconName: 'FileText',
     sections: [newSection]
   };
 
