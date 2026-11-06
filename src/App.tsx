@@ -17,7 +17,7 @@ import { DEFAULT_MANUALS } from './data/defaultManuals';
 import { DEFAULT_PROPOSALS } from './data/defaultProposals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from './data/userChatThreads';
 import { ChatMessage, Citation, ManualDocument, ManualSection, KnowledgeProposal, UserChatThread } from './types/manual';
-import { approveProposal, rejectProposal } from './utils/approvalWorkflow';
+import { approveProposal, rejectProposal, sanitizeFirestoreDoc } from './utils/approvalWorkflow';
 import { searchManuals, generateLocalGroundedAnswer } from './utils/manualSearch';
 
 export default function App() {
@@ -428,34 +428,40 @@ export default function App() {
     });
   };
 
-  const handleSubmitProposal = (newProp: KnowledgeProposal) => {
-    setProposals(prev => [newProp, ...prev.filter(p => p.id !== newProp.id)]);
-    setDoc(doc(db, 'proposals', newProp.id), newProp).catch(console.warn);
+  const handleSubmitProposal = async (newProp: KnowledgeProposal) => {
+    const cleanProp = sanitizeFirestoreDoc(newProp);
+    setProposals(prev => [cleanProp, ...prev.filter(p => p.id !== cleanProp.id)]);
+    try {
+      await setDoc(doc(db, 'proposals', cleanProp.id), cleanProp);
+    } catch (err) {
+      console.warn('Error saving proposal to Firestore:', err);
+    }
     showToast('Enseñanza enviada. Pendiente de aprobación por el Admin.');
   };
 
-  const handleApproveProposal = (prop: KnowledgeProposal, _approverName?: string) => {
+  const handleApproveProposal = async (prop: KnowledgeProposal, _approverName?: string) => {
     if (!isFabian) {
       showToast('Solo el Admin puede aceptar enseñanzas.');
       return;
     }
     const { updatedManuals, approvedProposal } = approveProposal(prop, manuals, 'Admin');
+    const cleanProp = sanitizeFirestoreDoc(approvedProposal);
     setManuals(updatedManuals);
-    setProposals(prev => prev.map(p => (p.id === prop.id ? approvedProposal : p)));
+    setProposals(prev => prev.map(p => (p.id === prop.id ? cleanProp : p)));
     const createdOrUpdatedManual = updatedManuals[0];
     if (createdOrUpdatedManual) {
-      setDoc(doc(db, 'manuals', createdOrUpdatedManual.id), createdOrUpdatedManual).catch(console.warn);
+      setDoc(doc(db, 'manuals', createdOrUpdatedManual.id), sanitizeFirestoreDoc(createdOrUpdatedManual)).catch(console.warn);
     }
-    setDoc(doc(db, 'proposals', prop.id), approvedProposal).catch(console.warn);
+    setDoc(doc(db, 'proposals', prop.id), cleanProp).catch(console.warn);
     showToast(`¡Aceptado por Admin! El manual "${prop.title}" ha sido incorporado.`);
   };
 
-  const handleRejectProposal = (prop: KnowledgeProposal, reason: string, _approverName?: string) => {
+  const handleRejectProposal = async (prop: KnowledgeProposal, reason: string, _approverName?: string) => {
     if (!isFabian) {
       showToast('Solo el Admin puede rechazar enseñanzas.');
       return;
     }
-    const rejected = rejectProposal(prop, reason, 'Admin');
+    const rejected = sanitizeFirestoreDoc(rejectProposal(prop, reason, 'Admin'));
     setProposals(prev => prev.map(p => (p.id === prop.id ? rejected : p)));
     setDoc(doc(db, 'proposals', prop.id), rejected).catch(console.warn);
     showToast('Enseñanza rechazada por Admin.');

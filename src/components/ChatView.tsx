@@ -33,7 +33,7 @@ interface ChatViewProps {
   onOpenProposeModal?: () => void;
   proposeModalOpen?: boolean;
   onCloseProposeModal?: () => void;
-  onSubmitProposal?: (proposal: KnowledgeProposal) => void;
+  onSubmitProposal?: (proposal: KnowledgeProposal) => Promise<void> | void;
   onOpenSection?: (section: ManualSection, manual: ManualDocument) => void;
   loggedUserName?: string;
   onLogout?: () => void;

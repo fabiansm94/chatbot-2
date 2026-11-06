@@ -1,6 +1,23 @@
 import { KnowledgeProposal, ManualDocument, ManualSection } from '../types/manual';
 
 /**
+ * Recursively cleans any object to remove keys with undefined values
+ * which Firebase Firestore strictly rejects.
+ */
+export function sanitizeFirestoreDoc<T extends Record<string, any>>(data: T): T {
+  const clean: any = Array.isArray(data) ? [] : {};
+  for (const [key, val] of Object.entries(data)) {
+    if (val === undefined) continue;
+    if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
+      clean[key] = sanitizeFirestoreDoc(val);
+    } else {
+      clean[key] = val;
+    }
+  }
+  return clean;
+}
+
+/**
  * Creates a new pending proposal submitted by an employee
  */
 export function createProposal(params: {
@@ -15,21 +32,28 @@ export function createProposal(params: {
   targetManualId?: string;
   articleNumber?: string;
 }): KnowledgeProposal {
-  return {
+  const proposal: KnowledgeProposal = {
     id: `prop-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     title: params.title.trim(),
-    category: params.category,
+    category: params.category || 'general',
     department: params.department.trim() || 'General',
     content: params.content.trim(),
-    tags: params.tags,
-    keyPoints: params.keyPoints,
+    tags: params.tags || [],
     submittedBy: params.submittedBy.trim() || 'Colaborador Anónimo',
     submittedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-    reason: params.reason.trim(),
-    targetManualId: params.targetManualId,
+    reason: params.reason.trim() || 'Propuesta desde Enseñar al Bot',
     articleNumber: params.articleNumber?.trim() || 'Procedimiento Aprobado',
     status: 'pending'
   };
+
+  if (params.keyPoints && params.keyPoints.length > 0) {
+    proposal.keyPoints = params.keyPoints;
+  }
+  if (params.targetManualId) {
+    proposal.targetManualId = params.targetManualId;
+  }
+
+  return proposal;
 }
 
 /**

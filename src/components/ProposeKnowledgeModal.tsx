@@ -20,7 +20,7 @@ import { cleanRawHtmlTags, textOrHtmlToEditorHtml } from '../utils/textFormattin
 interface ProposeKnowledgeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitProposal: (proposal: KnowledgeProposal) => void;
+  onSubmitProposal: (proposal: KnowledgeProposal) => Promise<void> | void;
   manuals: ManualDocument[];
 }
 
@@ -33,6 +33,7 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
   const [title, setTitle] = useState('');
   const [contentHtml, setContentHtml] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [fileSizeStr, setFileSizeStr] = useState<string | null>(null);
@@ -159,7 +160,7 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim()) {
@@ -173,22 +174,32 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
       return;
     }
 
-    const loggedUser =
-      (typeof window !== 'undefined' && localStorage.getItem('manualbot_logged_user_name_v1')) ||
-      'Colaborador';
+    setIsSubmitting(true);
+    setError(null);
 
-    const newProposal = createProposal({
-      title: title.trim(),
-      category: 'general',
-      department: 'Control y Monitoreo',
-      content: plainTextContent,
-      tags: ['manual', 'oficial'],
-      submittedBy: loggedUser,
-      reason: 'Propuesta desde Enseñar al Bot'
-    });
+    try {
+      const loggedUser =
+        (typeof window !== 'undefined' && localStorage.getItem('manualbot_logged_user_name_v1')) ||
+        'Colaborador';
 
-    onSubmitProposal(newProposal);
-    handleClose();
+      const newProposal = createProposal({
+        title: title.trim(),
+        category: 'general',
+        department: 'Control y Monitoreo',
+        content: plainTextContent,
+        tags: ['manual', 'oficial'],
+        submittedBy: loggedUser,
+        reason: 'Propuesta desde Enseñar al Bot'
+      });
+
+      await onSubmitProposal(newProposal);
+      handleClose();
+    } catch (err: any) {
+      console.error('Error al enviar propuesta:', err);
+      setError(err?.message || 'Error al enviar la enseñanza a Firebase.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -390,25 +401,43 @@ export const ProposeKnowledgeModal: React.FC<ProposeKnowledgeModalProps> = ({
         </div>
 
         {/* Footer Buttons anchored at bottom of chat */}
-        <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-[#262835] border-t border-[#3e4153] flex items-center justify-between gap-3 shrink-0 flex-wrap">
-          <span className="text-[11px] text-amber-300 font-medium">
-            ⏳ Estado al enviar: Pendiente de aprobación por Admin
-          </span>
-          <div className="flex items-center gap-2.5 ml-auto">
+        <div className="px-4 py-3 sm:px-6 sm:py-3.5 bg-[#262835] border-t border-[#3e4153] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-[11px] text-amber-300 font-medium">
+              ⏳ Estado al enviar: Pendiente de aprobación por Admin
+            </span>
+            {error && (
+              <span className="text-xs text-rose-300 font-bold flex items-center gap-1.5 animate-pulse">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span>{error}</span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2.5 ml-auto shrink-0 justify-end">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 rounded-xl bg-[#2f3140] hover:bg-[#3e4153] text-slate-200 text-xs font-medium transition-colors border border-[#3e4153] cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-xl bg-[#2f3140] hover:bg-[#3e4153] disabled:opacity-50 text-slate-200 text-xs font-medium transition-colors border border-[#3e4153] cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isUploading}
+              disabled={isUploading || isSubmitting}
               className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] disabled:opacity-50 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>Enviar para Aprobación</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Enviando...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Enviar para Aprobación</span>
+                </>
+              )}
             </button>
           </div>
         </div>

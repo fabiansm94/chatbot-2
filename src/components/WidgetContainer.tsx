@@ -8,6 +8,7 @@ import { LoginModal } from './LoginModal';
 import { DEFAULT_MANUALS } from '../data/defaultManuals';
 import { DEFAULT_USER_THREADS, appendUserMessage } from '../data/userChatThreads';
 import { searchManuals, generateLocalGroundedAnswer } from '../utils/manualSearch';
+import { sanitizeFirestoreDoc } from '../utils/approvalWorkflow';
 
 interface WidgetContainerProps {
   companyName: string;
@@ -91,9 +92,14 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     localStorage.setItem('manualbot_auth_v1', 'false');
   };
 
-  const handleSubmitProposal = (newProp: KnowledgeProposal) => {
-    setDoc(doc(db, 'proposals', newProp.id), newProp).catch(console.warn);
-    setToastMessage('¡Propuesta enviada al buzón de aprobaciones!');
+  const handleSubmitProposal = async (newProp: KnowledgeProposal) => {
+    const cleanProp = sanitizeFirestoreDoc(newProp);
+    try {
+      await setDoc(doc(db, 'proposals', cleanProp.id), cleanProp);
+    } catch (err) {
+      console.warn('Error saving proposal to Firestore:', err);
+    }
+    setToastMessage('¡Propuesta enviada al buzón de aprobaciones del Admin!');
     setTimeout(() => setToastMessage(null), 3500);
   };
 

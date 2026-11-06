@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProposal, approveProposal, rejectProposal } from './approvalWorkflow';
+import { createProposal, approveProposal, rejectProposal, sanitizeFirestoreDoc } from './approvalWorkflow';
 import { DEFAULT_MANUALS } from '../data/defaultManuals';
 
 test('createProposal initiates pending knowledge proposal with metadata', () => {
@@ -60,4 +60,36 @@ test('rejectProposal sets status to rejected and attaches rejection reason', () 
   assert.equal(rejected.status, 'rejected');
   assert.equal(rejected.rejectionReason, 'Contradice la política de seguridad y protección de datos');
   assert.equal(rejected.reviewedBy, 'CISO');
+});
+
+test('createProposal and sanitizeFirestoreDoc contain NO undefined keys that Firestore rejects', () => {
+  const proposal = createProposal({
+    title: 'Nuevo procedimiento',
+    category: 'general',
+    department: 'Control',
+    content: 'Texto de prueba',
+    tags: ['prueba'],
+    submittedBy: 'Colaborador',
+    reason: 'Enseñanza'
+  });
+
+  const keys = Object.keys(proposal) as (keyof typeof proposal)[];
+  for (const k of keys) {
+    assert.notEqual(proposal[k], undefined, `Key "${k}" must not be undefined`);
+  }
+
+  const rawObjectWithUndefined = {
+    id: 'prop-123',
+    title: 'Test',
+    nested: {
+      a: 1,
+      b: undefined
+    },
+    missing: undefined
+  };
+
+  const clean = sanitizeFirestoreDoc(rawObjectWithUndefined);
+  assert.equal('missing' in clean, false, 'Undefined property "missing" must be removed');
+  assert.equal('b' in clean.nested, false, 'Nested undefined property "b" must be removed');
+  assert.equal(clean.nested.a, 1);
 });
