@@ -30,7 +30,7 @@ export const ManualDrawer: React.FC<ManualDrawerProps> = ({
     '';
 
   const handleCopy = () => {
-    const textToCopy = `[${manual.code} - ${manual.title}]\n\n${fullContent}`;
+    const textToCopy = `[${manual.title}]\n\n${fullContent}`;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -46,16 +46,13 @@ export const ManualDrawer: React.FC<ManualDrawerProps> = ({
         {/* Header */}
         <div className="p-5 border-b border-[#3e4153] bg-[#262835] flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#ca4048]/20 text-[#ca4048] border border-[#ca4048]/30">
-                {manual.code}
-              </span>
-              {manual.updatedDate && (
+            {manual.updatedDate && (
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="text-xs text-slate-400">
                   Actualizado: {manual.updatedDate}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-[#ca4048] shrink-0" />
               <span>{manual.title}</span>

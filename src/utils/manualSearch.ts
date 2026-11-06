@@ -153,7 +153,10 @@ export function getSpanishStem(word: string): string {
  */
 export function matchKeywordScore(normText: string, textTokens: string[], kw: string): number {
   if (!kw || !normText) return 0;
-  if (normText.includes(kw)) return 1.0;
+
+  // Exact token match or word boundary match
+  if (textTokens.includes(kw)) return 1.0;
+  if (new RegExp(`(^|\\s)${kw}(\\s|$)`).test(normText)) return 1.0;
 
   if (kw.length >= 4) {
     const singular = kw.endsWith('es') && kw.length >= 5
@@ -164,7 +167,7 @@ export function matchKeywordScore(normText: string, textTokens: string[], kw: st
 
     if (singular.length >= 4) {
       for (const token of textTokens) {
-        if (token === singular || token === `${singular}s` || token === `${singular}es` || token.startsWith(singular)) {
+        if (token === singular || token === `${singular}s` || token === `${singular}es`) {
           return 0.9;
         }
       }
@@ -175,7 +178,7 @@ export function matchKeywordScore(normText: string, textTokens: string[], kw: st
     const stem = getSpanishStem(kw);
     if (stem.length >= 4) {
       for (const token of textTokens) {
-        if (token.length >= 4 && (token.startsWith(stem) || getSpanishStem(token) === stem)) {
+        if (token.length >= 4 && (token === stem || getSpanishStem(token) === stem)) {
           return 0.8;
         }
       }
@@ -184,6 +187,67 @@ export function matchKeywordScore(normText: string, textTokens: string[], kw: st
 
   return 0;
 }
+
+export const DOMAIN_SYNONYMS: Record<string, string[]> = {
+  motorizado: ['soporte', 'apoyo', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia', 'despacha', 'motorizado'],
+  soporte: ['motorizado', 'apoyo', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia'],
+  apoyo: ['motorizado', 'soporte', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia'],
+  geo: ['motorizado', 'soporte', 'apoyo', 'patrulla', 'envia'],
+  camara: ['camaras', 'cctv', 'video', 'domo', 'monitoreo', 'xeoma', 'dmss'],
+  camaras: ['camara', 'cctv', 'video', 'domo', 'monitoreo', 'xeoma', 'dmss'],
+  cctv: ['camara', 'camaras', 'video', 'monitoreo', 'xeoma', 'dmss'],
+  xeoma: ['camara', 'camaras', 'cctv', 'monitoreo'],
+  dmss: ['camara', 'camaras', 'audio', 'rancho', 'app', 'microfono'],
+  oficial: ['oficiales', 'guarda', 'guardia', 'vigilante', 'efectivo'],
+  oficiales: ['oficial', 'guarda', 'guardia', 'vigilante', 'efectivo'],
+  guarda: ['oficial', 'guardia', 'vigilante', 'efectivo'],
+  guardia: ['oficial', 'guarda', 'vigilante', 'efectivo'],
+  encargado: ['responsable', 'administrador', 'administradora', 'jefe', 'autorizado', 'supervisor', 'staff'],
+  responsable: ['encargado', 'administrador', 'administradora', 'jefe', 'autorizado', 'supervisor', 'staff'],
+  administrador: ['encargado', 'responsable', 'administradora', 'jefe', 'autorizado'],
+  administradora: ['encargado', 'responsable', 'administrador', 'jefe', 'autorizado'],
+  staff: ['personal', 'colaboradores', 'equipo', 'jairo', 'heidy', 'heidi', 'alexander', 'jordan'],
+  personal: ['staff', 'colaboradores', 'equipo', 'oficial', 'oficiales', 'limpieza', 'piscina'],
+  distancia: ['metros', 'kilometros', 'encuentra', 'ubicado'],
+  metros: ['distancia', 'encuentra', 'ubicado'],
+  horario: ['servicio', 'horas', 'hrs', 'atencion', 'turno', 'abre', 'cierra', 'apertura', 'cierre', 'am', 'pm'],
+  horarios: ['servicio', 'horas', 'hrs', 'atencion', 'turno', 'abre', 'cierra', 'apertura', 'cierre', 'am', 'pm'],
+  hora: ['horario', 'servicio', 'horas', 'hrs', 'abre', 'cierra', 'apertura', 'cierre', 'am', 'pm'],
+  horas: ['horario', 'servicio', 'hora', 'hrs', 'abre', 'cierra', 'am', 'pm'],
+  abre: ['apertura', 'horario', 'servicio', 'am', 'hora'],
+  abren: ['apertura', 'horario', 'servicio', 'am', 'hora'],
+  cierra: ['cierre', 'horario', 'servicio', 'pm', 'hora'],
+  cierran: ['cierre', 'horario', 'servicio', 'pm', 'hora'],
+  luz: ['electricidad', 'energia', 'planta', 'corte', 'generador', 'suministro'],
+  electricidad: ['luz', 'energia', 'planta', 'corte', 'generador', 'suministro'],
+  energia: ['luz', 'electricidad', 'planta', 'corte', 'generador'],
+  corte: ['luz', 'electricidad', 'energia', 'planta'],
+  planta: ['electricidad', 'luz', 'energia', 'generador', 'bombas'],
+  direccion: ['ubicacion', 'ubicado', 'donde', 'calle', 'entrada', 'canton', 'distrito', 'provincia', 'maps'],
+  ubicacion: ['direccion', 'ubicado', 'donde', 'calle', 'entrada', 'canton', 'distrito', 'provincia', 'maps'],
+  donde: ['direccion', 'ubicacion', 'ubicado', 'calle', 'entrada'],
+  parqueo: ['parqueos', 'estacionamiento', 'visita', 'visitas', 'vehiculo', 'vehiculos', 'rancho', 'garaje'],
+  parqueos: ['parqueo', 'estacionamiento', 'visita', 'visitas', 'vehiculo', 'vehiculos', 'rancho', 'garaje'],
+  estacionamiento: ['parqueo', 'parqueos', 'visita', 'visitas', 'vehiculo', 'garaje'],
+  visita: ['visitas', 'parqueo', 'invitados', 'ingreso', 'registro'],
+  visitas: ['visita', 'parqueo', 'invitados', 'ingreso', 'registro'],
+  piscina: ['rancho', 'horario', 'parlante', 'botellas', 'limpieza', 'jairo'],
+  rancho: ['piscina', 'horario', 'parlante', 'parqueos', 'visita'],
+  queja: ['quejas', 'ruido', 'desorden', 'parlante', 'llamado', 'asistencia', 'supervisor'],
+  quejas: ['queja', 'ruido', 'desorden', 'parlante', 'llamado', 'asistencia', 'supervisor'],
+  ruido: ['queja', 'quejas', 'musica', 'volumen', 'parlante', 'desorden'],
+  musica: ['ruido', 'volumen', 'parlante', 'desorden'],
+  perro: ['perros', 'mascota', 'mascotas', 'correa', 'popo'],
+  perros: ['perro', 'mascota', 'mascotas', 'correa', 'popo'],
+  mascota: ['mascotas', 'perro', 'perros', 'correa', 'popo'],
+  mascotas: ['mascota', 'perro', 'perros', 'correa', 'popo'],
+  porton: ['portones', 'puerta', 'entrada', 'salida', 'sensor', 'quickpass', 'peatonal', 'vehicular'],
+  portones: ['porton', 'puerta', 'entrada', 'salida', 'sensor', 'quickpass', 'peatonal', 'vehicular'],
+  puerta: ['porton', 'portones', 'entrada', 'salida', 'acceso'],
+  clave: ['contrasena', 'password', 'acceso', 'correo'],
+  contrasena: ['clave', 'password', 'acceso', 'correo'],
+  correo: ['email', 'contacto', 'clave', 'contrasena']
+};
 
 /**
  * Searches manuals using weighted keyword and phrase scoring
@@ -260,21 +324,40 @@ export function searchManuals(
         score += 100;
       }
 
-      // Keywords match across title, manual title, tags and content (including Spanish stems)
+      // Keywords match across title, manual title, tags and content (including Spanish stems and domain synonyms)
       for (const kw of keywords) {
         const isGeneric = GENERIC_QUERY_VERBS.has(kw);
         const weightMultiplier = isGeneric ? 0.35 : 1.0;
 
-        const titleMatch = Math.max(
+        let titleMatch = Math.max(
           matchKeywordScore(normTitle, titleTokens, kw),
           matchKeywordScore(normManualTitle, manualTitleTokens, kw)
         );
+        let tagMatch = matchKeywordScore(normTags, tagTokens, kw);
+        let contentMatch = matchKeywordScore(normContent, contentTokens, kw);
+
+        // Check domain synonyms if direct match is zero
+        if (titleMatch === 0 && tagMatch === 0 && contentMatch === 0) {
+          const syns = DOMAIN_SYNONYMS[kw] || DOMAIN_SYNONYMS[getSpanishStem(kw)] || [];
+          for (const syn of syns) {
+            const sContent = matchKeywordScore(normContent, contentTokens, syn);
+            if (sContent > 0) {
+              contentMatch = sContent * 0.85;
+              break;
+            }
+            const sTitle = Math.max(
+              matchKeywordScore(normTitle, titleTokens, syn),
+              matchKeywordScore(normManualTitle, manualTitleTokens, syn)
+            );
+            if (sTitle > 0) {
+              titleMatch = sTitle * 0.85;
+              break;
+            }
+          }
+        }
+
         if (titleMatch > 0) score += 25 * titleMatch * weightMultiplier;
-
-        const tagMatch = matchKeywordScore(normTags, tagTokens, kw);
         if (tagMatch > 0) score += 20 * tagMatch * weightMultiplier;
-
-        const contentMatch = matchKeywordScore(normContent, contentTokens, kw);
         if (contentMatch > 0) score += 12 * contentMatch * weightMultiplier;
 
         if (normArticle.includes(kw)) score += 30 * weightMultiplier;
@@ -306,7 +389,7 @@ export function searchManuals(
   const sorted = results.sort((a, b) => b.score - a.score);
   if (sorted.length > 1) {
     const topScore = sorted[0].score;
-    return sorted.filter(r => r.score >= topScore * 0.45).slice(0, maxResults);
+    return sorted.filter(r => r.score >= topScore * 0.35 || r.score >= 24).slice(0, maxResults);
   }
   return sorted.slice(0, maxResults);
 }
@@ -330,11 +413,8 @@ export function buildManualContext(results: SearchResult[], query?: string): str
         : cleanedContent.slice(0, 300);
 
       return `### [REFERENCIA ${index + 1}]
-Manual: ${manual.title} (${manual.code}, v${manual.version})
-Departamento: ${manual.department}
-Artículo: ${section.articleNumber} - "${section.title}"
-Identificador: ${manual.id}#${section.id}
-DATO EXACTO DEL MANUAL QUE RESPONDE LA PREGUNTA (RESPONDER EXCLUSIVAMENTE CON ESTE DATO, PROHIBIDO AGREGAR OTROS PUNTOS):
+Título: ${manual.title}
+DATO EXACTO QUE RESPONDE LA PREGUNTA (RESPONDER EXCLUSIVAMENTE CON ESTE DATO DE FORMA DIRECTA, PROHIBIDO NOMBRAR EL MANUAL O CÓDIGOS EN EL TEXTO):
 "${targetedData}"
 ---`;
     })
@@ -585,6 +665,7 @@ function splitIntoGranularSegments(text: string): string[] {
   const rawLines = cleaned
     .replace(/\s*[➤►▸➜➔➡●○▪▫■□✓✔√]+\s*/g, '\n')
     .replace(/\s+\/\s*(?=[A-ZÁÉÍÓÚÑ])/g, '\n')
+    .replace(/\s*(?=(?:Direcci[óo]n|Horario|Puesto|Nota|Importante|Personal|Provincia|rovincia)\s*[:])/gi, '\n')
     .replace(/(?<=[.!?])\s+(?=(?:\d{1,2}[.)]|[a-zA-Z][.)]|•)\s+)/g, '\n')
     .split(/\r?\n/)
     .map(l => l.trim())
@@ -626,20 +707,6 @@ function splitIntoGranularSegments(text: string): string[] {
   return segments;
 }
 
-const DOMAIN_SYNONYMS: Record<string, string[]> = {
-  motorizado: ['soporte', 'apoyo', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia', 'despacha', 'motorizado'],
-  soporte: ['motorizado', 'apoyo', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia'],
-  apoyo: ['motorizado', 'soporte', 'unidad', 'respuesta', 'patrulla', 'geo', 'envia'],
-  camara: ['camaras', 'cctv', 'video', 'domo', 'monitoreo'],
-  camaras: ['camara', 'cctv', 'video', 'domo', 'monitoreo'],
-  oficial: ['oficiales', 'guarda', 'guardia', 'vigilante', 'efectivo'],
-  guarda: ['oficial', 'guardia', 'vigilante', 'efectivo'],
-  encargado: ['responsable', 'administrador', 'administradora', 'jefe', 'autorizado', 'supervisor'],
-  responsable: ['encargado', 'administrador', 'administradora', 'jefe', 'autorizado', 'supervisor'],
-  distancia: ['metros', 'kilometros', 'encuentra', 'ubicado'],
-  metros: ['distancia', 'encuentra', 'ubicado']
-};
-
 /**
  * Splits a sentence by commas outside parentheses into atomic clauses,
  * keeping relative clauses (", el cual...") and conditional clauses ("En caso de..., ") attached.
@@ -666,14 +733,19 @@ function splitIntoAtomicClauses(sentence: string): string[] {
 
   if (rawParts.length <= 1) return [sentence];
 
-  // Step 1: Merge backward any relative clause starting with "el cual", "la cual", "quien", "donde", "que se", etc.
+  // Step 1: Merge backward any relative clause, address continuation, or list of names/items
   const backwardMerged: string[] = [];
   for (const part of rawParts) {
     const normPart = normalizeText(part);
-    if (
-      backwardMerged.length > 0 &&
-      /^(?:el cual|la cual|los cuales|las cuales|lo cual|quien|quienes|donde|cuyo|cuya|que se\b|mismo que\b|asi como\b)/i.test(normPart)
-    ) {
+    const prev = backwardMerged.length > 0 ? normalizeText(backwardMerged[backwardMerged.length - 1]) : '';
+    const isRelative = /^(?:el cual|la cual|los cuales|las cuales|lo cual|quien|quienes|donde|cuyo|cuya|que se\b|mismo que\b|asi como\b)/i.test(normPart);
+    const isAddress = /(?:direcci[óo]n|calle|avenida|entrada|barrio|provincia|cant[óo]n|distrito)\b/i.test(prev);
+    const isListOrNames =
+      /^(?:o\s+|y\s+|e\s+|u\s+|ademas\b)/i.test(normPart) ||
+      /(?:staff|personal|equipo)\b/i.test(prev) ||
+      (/\b(jairo|heidy|heidi|alexander|jordan)\b/i.test(prev) && /\b(jairo|heidy|heidi|alexander|jordan)\b/i.test(normPart));
+
+    if (backwardMerged.length > 0 && (isRelative || isAddress || isListOrNames)) {
       backwardMerged[backwardMerged.length - 1] = `${backwardMerged[backwardMerged.length - 1]}, ${part}`;
     } else {
       backwardMerged.push(part);
@@ -965,11 +1037,26 @@ export function extractRelevantExcerpt(
     const matchedSpecificKws: string[] = [];
 
     for (const kw of keywords) {
-      const m = matchKeywordScore(norm, tokens, kw);
+      let m = matchKeywordScore(norm, tokens, kw);
+      if (m === 0) {
+        const syns = DOMAIN_SYNONYMS[kw] || DOMAIN_SYNONYMS[getSpanishStem(kw)] || [];
+        for (const syn of syns) {
+          const sm = matchKeywordScore(norm, tokens, syn);
+          if (sm > 0) {
+            m = sm * 0.9;
+            break;
+          }
+        }
+      }
+
       if (m > 0) {
         const isGeneric = GENERIC_QUERY_VERBS.has(kw);
+        const isTitleWord = titleWords.has(kw);
         if (isGeneric) {
           score += 5 * m;
+        } else if (isTitleWord && questionFocusKws.length > 0) {
+          // Manual title / site keyword (e.g. "sabo", "foresta"): low weight so specific fact keywords win
+          score += 4 * m;
         } else {
           matchedSpecificKws.push(kw);
           const isInPreamble = matchKeywordScore(firstSegmentNorm, firstSegmentTokens, kw) > 0;
@@ -977,18 +1064,21 @@ export function extractRelevantExcerpt(
             score += 6 * m;
           } else {
             const rarityBonus = (kwSentenceFreq[kw] || 1) === 1 ? 14 : 0;
-            score += (26 + rarityBonus) * m;
+            score += (28 + rarityBonus) * m;
           }
         }
       }
     }
 
     if (entityType === 'schedule') {
-      if (/\b(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm|hrs|horas)|de\s+\d{1,2}[:\d]*\s*a\s*\d{1,2}[:\d]*|lunes a viernes|lunes a sabado|martes a domingo|cada\s+\d+\s*(minutos|min|hrs|horas)|turno|horario)\b/i.test(norm)) {
+      if (
+        /\b(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm|hrs|horas|h)|de\s+\d{1,2}[:\d]*\s*a\s*\d{1,2}[:\d]*|lunes a viernes|lunes a sabado|martes a domingo|cada\s+\d+\s*(minutos|min|hrs|horas)|turno|horario|servicio de)\b/i.test(s) ||
+        /\b(\d{1,2}\s+\d{2}|de\s+\d{1,2}\s+\d{2}\s+a\s+\d{1,2}\s+\d{2}|06 00|18 00|23 00|08 00|11pm|8am|turno|horario|servicio)\b/i.test(norm)
+      ) {
         score += 35;
       }
     } else if (entityType === 'person') {
-      if (/\b(responsable|encargad[oa]|jefe|jefatura|coordinador[a]?|oficial|supervisor[a]?|gerente|operador|director[a]?|contacto|correo|email|anexo|telefono|personal autorizado|autorizad[oa]|administrad[oa]r?[a]?)\b/i.test(norm)) {
+      if (/\b(responsable|encargad[oa]|jefe|jefatura|coordinador[a]?|oficial|supervisor[a]?|gerente|operador|director[a]?|contacto|correo|email|anexo|telefono|personal autorizado|autorizad[oa]|administrad[oa]r?[a]?|staff|jairo|heidy|heidi|alexander|jordan|cinthia)\b/i.test(norm)) {
         score += 35;
       }
       if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(s)) {
@@ -1116,7 +1206,7 @@ export function generateLocalGroundedAnswer(
   // 3. Work query but nothing matched in manuals
   if (results.length === 0) {
     return {
-      answer: `¡Oye! Estuve revisando con atención nuestro **Book de Manuales Internos**, pero no encontré una política o procedimiento que hable específicamente de *"${query}"*.\n\nPara que no te quedes con la duda, te recomiendo consultar directamente con el equipo de **Gestión de Personas (RRHH)** en \`rrhh-gestion@empresa.com\` o con tu líder directo. ¡Si tienes otra duda sobre beneficios o trámites, avísame y lo buscamos juntos!`,
+      answer: `No encontré un procedimiento registrado en los manuales sobre *"${query}"*.\n\nTe sugiero consultar con el supervisor de turno o verificar con el administrador del puesto.`,
       citations: []
     };
   }
@@ -1133,23 +1223,20 @@ export function generateLocalGroundedAnswer(
   let answer = '';
 
   if (tone === 'steps') {
-    answer = `¡Hola! Claro que sí, aquí tienes puntualmente lo que indica el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]):\n\n`;
     if (primary.section.keyPoints && primary.section.keyPoints.length > 0) {
       primary.section.keyPoints.forEach((point, i) => {
         answer += `${i + 1}. **${point}**\n`;
       });
       if (relevantExcerpt && !primary.section.keyPoints.some(kp => relevantExcerpt.includes(kp))) {
-        answer += `\n**Dato puntual:**\n${relevantExcerpt}\n`;
+        answer += `\n${relevantExcerpt}\n`;
       }
     } else {
-      answer += `${relevantExcerpt}\n`;
+      answer += `${relevantExcerpt}`;
     }
-    answer += `\n*(Cualquier duda adicional, puedes revisar la referencia completa [${primary.section.articleNumber}] abajo).*`;
   } else if (tone === 'detailed') {
-    answer = `¡Hola! Te comparto la parte específica que aplica según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber} - *${primary.section.title}*]):\n\n`;
-    answer += `${relevantExcerpt}\n\n`;
+    answer = `${relevantExcerpt}`;
     if (primary.section.keyPoints && primary.section.keyPoints.length > 0) {
-      answer += `**Puntos clave:**\n`;
+      answer += `\n\n**Puntos clave:**\n`;
       primary.section.keyPoints.slice(0, 3).forEach(kp => {
         answer += `- ${kp}\n`;
       });
@@ -1177,12 +1264,12 @@ export function generateLocalGroundedAnswer(
           }
           return `- ${l}`;
         }).join('\n');
-        answer = `En **${siteWord}**, el personal correspondiente es:\n${bulletList}\n\n[${primary.manual.code}: ${primary.section.articleNumber}].`;
+        answer = `En **${siteWord}**, el personal correspondiente es:\n${bulletList}`;
       } else {
         const parts = rosterLines[0].split(/\s*[-–—]\s*/);
         const name = parts[0];
         const role = parts.slice(1).join(' - ').replace(new RegExp(`\\b${siteWord}\\b`, 'gi'), '').trim();
-        answer = `En **${siteWord}**, **${name}** está a cargo de: **${role || parts.slice(1).join(' - ')}** [${primary.manual.code}: ${primary.section.articleNumber}].`;
+        answer = `En **${siteWord}**, **${name}** está a cargo de: **${role || parts.slice(1).join(' - ')}**.`;
       }
     } else if (whoMatch && (targetEntityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
       const targetName = whoMatch[1].trim();
@@ -1192,23 +1279,18 @@ export function generateLocalGroundedAnswer(
       if (normEx.includes('personal autorizado') || normEx.includes('administrad')) {
         const isFemale = targetName.endsWith('a') || /\b(cinthia|claudia|maria|laura|ana|paula|carolina|daniela|patricia|marcela)\b/i.test(targetName);
         const pronoun = isFemale ? 'Ella' : 'Él';
-        answer = `${pronoun} es la administradora de **${siteName}** [${primary.manual.code}: ${primary.section.articleNumber}].`;
+        answer = `${pronoun} es la administradora de **${siteName}**.`;
       } else {
-        answer = `${targetName} figura en **${siteName}** como: **${relevantExcerpt}** [${primary.manual.code}: ${primary.section.articleNumber}].`;
+        answer = relevantExcerpt.trim();
       }
     } else {
-      // Direct and concise response (never dumps the whole manual)
-      const formattedExcerpt = relevantExcerpt.includes('\n')
-        ? `\n${relevantExcerpt}`
-        : relevantExcerpt.includes('**')
-          ? relevantExcerpt
-          : `**${relevantExcerpt}**`;
-      answer = `Según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]): ${formattedExcerpt}`;
+      // Direct and natural response without "Según el manual..." or manual numbers
+      answer = relevantExcerpt.trim();
     }
   }
 
   return {
-    answer,
+    answer: answer.trim(),
     citations
   };
 }

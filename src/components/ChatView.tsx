@@ -331,10 +331,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
                               key={idx}
                               type="button"
                               onClick={() => onOpenCitation(cit)}
-                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-50/80 border border-rose-200/80 hover:border-[#b82733] text-[11px] text-[#b82733] font-medium transition-colors shadow-2xs"
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-50/80 border border-rose-200/80 hover:border-[#b82733] text-[11px] text-[#b82733] font-semibold transition-colors shadow-2xs cursor-pointer"
                             >
-                              <span className="font-bold">{cit.articleNumber}</span>
-                              <span className="text-slate-600 truncate max-w-[140px]">{cit.sectionTitle}</span>
+                              <span className="truncate max-w-[200px]">{cit.manualTitle || cit.sectionTitle}</span>
                             </button>
                           ))}
                         </div>
@@ -343,26 +342,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
                     {/* Message Actions / Meta */}
                     <div
-                      className={`mt-1.5 pt-1 flex items-center justify-between text-[10px] border-t select-none ${
+                      className={`mt-1.5 pt-1 flex items-center justify-end text-[10px] border-t select-none ${
                         isUser
                           ? 'border-white/20 text-white/80'
                           : 'border-rose-100/80 text-slate-400'
                       }`}
                     >
-                      {!isUser ? (
-                        <div className="flex items-center gap-1">
-                          {msg.citations && msg.citations.length > 0 ? (
-                            <span className="flex items-center gap-1 text-emerald-600 font-semibold">
-                              <ShieldCheck className="w-3 h-3" />
-                              <span>Verificado</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">AI-zen</span>
-                          )}
-                        </div>
-                      ) : (
-                        <div />
-                      )}
 
                       <div className="flex items-center gap-1.5">
                         {!isUser && (

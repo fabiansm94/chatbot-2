@@ -35,7 +35,20 @@ function enforceLaserSpecificAnswer(
   if (searchResults.length === 0) return generatedText;
   const primary = searchResults[0];
   const siteName = cleanSiteName(primary.manual.title);
-  const citation = `[${primary.manual.code}: ${primary.section.articleNumber}]`;
+
+  // Strip any "Según el manual..." prefix or bracketed [MAN-...] citations
+  let cleaned = generatedText
+    .replace(/\s*\(\[[^\]]+\]\):?/g, '')
+    .replace(/\s*\[(?:MAN-|ART|Art|Ref|CÓDIGO)[^\]]*\]\.?/gi, '')
+    .replace(
+      /^(?:¡Hola!\s*)?(?:Claro(?:\s+que\s+s[íi])?[,.\s]*)?(?:Seg[úu]n|De acuerdo (?:con|a)|Conforme a)\s+(?:el|la|los|las)?\s*(?:manual|protocolo|procedimiento|art[íi]culo|documento)?\s*(?:\*\*[^*]+\*\*|"[^"]+"|[^,:.\n]+)\s*[:,]\s*/i,
+      ''
+    )
+    .trim();
+
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
 
   // 1. Who-is query (e.g. "quién es Cinthia Collado?", "quien es cinthia collado?")
   const whoMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+|^)([a-záéíóú\s]+?)(?:\?|$)/i);
@@ -49,7 +62,7 @@ function enforceLaserSpecificAnswer(
 
     if (normSec.includes(normalizeText(targetName)) || normSec.includes('cinthia')) {
       if (normSec.includes('administrad') || normSec.includes('personal autorizado')) {
-        return `${pronoun} es la administradora de **${siteName}** ${citation}.`;
+        return `${pronoun} es la administradora de **${siteName}**.`;
       }
     }
   }
@@ -62,17 +75,12 @@ function enforceLaserSpecificAnswer(
     primary.manual.title
   );
   if (
-    /establece puntualmente lo siguiente/i.test(generatedText) ||
-    /en primer lugar, se debe controlar/i.test(generatedText) ||
-    (generatedText.length > 320 && (entityType === 'person' || entityType === 'schedule' || entityType === 'amount')) ||
-    (excerpt && generatedText.length > Math.max(340, excerpt.length * 2.2))
+    /establece puntualmente lo siguiente/i.test(cleaned) ||
+    /en primer lugar, se debe controlar/i.test(cleaned) ||
+    (cleaned.length > 320 && (entityType === 'person' || entityType === 'schedule' || entityType === 'amount')) ||
+    (excerpt && cleaned.length > Math.max(340, excerpt.length * 2.2))
   ) {
-    const formattedExcerpt = excerpt.includes('\n')
-      ? `\n${excerpt}`
-      : excerpt.includes('**')
-        ? excerpt
-        : `**${excerpt}**`;
-    return `Según el **${primary.manual.title}** (${citation}): ${formattedExcerpt}`;
+    return excerpt.trim();
   }
 
   // 3. Multi-site query enforcement:
@@ -83,24 +91,24 @@ function enforceLaserSpecificAnswer(
   if (queriedSites.length === 1) {
     const targetSite = queriedSites[0];
     const otherSites = candidateSites.filter(s => s !== targetSite);
-    const hasOtherSite = otherSites.some(s => normalizeText(generatedText).includes(s));
+    const hasOtherSite = otherSites.some(s => normalizeText(cleaned).includes(s));
     if (hasOtherSite) {
-      const excerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
+      const siteExcerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints, primary.manual.title);
       const siteWord = targetSite.charAt(0).toUpperCase() + targetSite.slice(1);
-      const lines = excerpt.split('\n').map(l => l.trim()).filter(Boolean);
+      const lines = siteExcerpt.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length > 1) {
         const bulletList = lines.map(l => {
           const parts = l.split(/\s*[-–—]\s*/);
           return parts.length >= 2 ? `- **${parts[0]}:** ${parts.slice(1).join(' - ')}` : `- ${l}`;
         }).join('\n');
-        return `En **${siteWord}**, el personal correspondiente es:\n${bulletList}\n\n${citation}`;
+        return `En **${siteWord}**, el personal correspondiente es:\n${bulletList}`;
       } else if (lines.length === 1) {
-        return `En **${siteWord}**, ${lines[0]} ${citation}.`;
+        return `En **${siteWord}**, ${lines[0]}.`;
       }
     }
   }
 
-  return generatedText;
+  return cleaned || generatedText;
 }
 
 export const app = express();
@@ -279,80 +287,49 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     if (aiClient) {
       const contextMarkdown = buildManualContext(searchResults, message);
 
-      const systemInstruction = `Eres "ManualBot", el compañero de trabajo y asistente interno de confianza en ${companyName}.
-Tu personalidad: Hablas con tus compañeros como un amigo del trabajo: eres cercano, cálido, simpático, empático y con buena onda. NUNCA suenes como un robot frío, una máquina burocrática ni un manual andante aburrido. Usa un español natural y fluido, con expresiones humanas y amables ("¡Hola! Claro que sí, mira...", "Ojo con este detalle...", "Qué buena pregunta, te cuento cómo funciona...", "Cualquier cosita me avisas y lo vemos").
+      const systemInstruction = `Eres "AI-zen", el asistente de Control y Monitoreo en ${companyName}.
+Tu estilo: Hablas de forma natural, directa y al grano, sin exceso de formalismo ni burocracia.
 
 REGLAS ESENCIALES DE CONVERSACIÓN:
 
-1. REGLA DE ORO ABSOLUTA — RESPONDER EXCLUSIVAMENTE LA PARTE ESPECÍFICA SOLICITADA (PROHIBIDO COMPLETAR O PEGAR EL RESTO DEL ARTÍCULO):
-   - Los manuales contienen muchos párrafos, subtítulos y oraciones compuestas con múltiples acciones.
-   - Cuando el usuario te pregunta por un aspecto o dato puntual (ej. una frecuencia, un horario, un nombre de responsable, un monto, un requisito o un plazo):
-     DEBES ENTREGAR EXCLUSIVAMENTE ESE DATO.
+1. REGLA DE ORO ABSOLUTA — RESPONDER DIRECTAMENTE SIN DECIR DE DÓNDE VIENE NI PONER CÓDIGOS DE MANUAL:
+   - PROHIBIDO decir frases como "Según el manual...", "Según el MC55...", "De acuerdo con el protocolo..." o mencionar el título del manual antes de responder, porque la interfaz ya muestra el botón de referencia abajo.
+   - PROHIBIDO escribir números o códigos de manual entre corchetes como [MAN-7405: Manual Oficial] o [MAN-SEG-01: Art. 1.1], ya que esos códigos no existen para el usuario.
+   - Cuando el usuario te pregunta por un aspecto o dato puntual (ej. qué motorizado se envía, cuántas cámaras hay, un horario, un nombre de responsable):
+     DEBES ENTREGAR EXCLUSIVAMENTE ESE DATO de forma directa y natural.
    - ESTÁ ESTRICTAMENTE PROHIBIDO agregar otras acciones secundarias, reportes, bitácoras, pasos posteriores o el resto del texto del manual que el usuario NO pidió.
-   - Si una oración del manual tiene varias partes o cláusulas (por ejemplo: "hacer patrullaje cada 15 minutos, reportando cualquier anomalía en la bitácora"), extrae ÚNICAMENTE la parte consultada y corta todo lo demás.
 
    EJEMPLOS CONCRETOS OBLIGATORIOS (SÍ vs NO):
-   * Caso 1 - Frecuencia o patrullaje:
-     - Manual: "El operador de monitoreo debe realizar patrullajes virtuales cada 15 minutos en todas las cámaras asignadas, reportando cualquier anomalía en la bitácora electrónica."
-     - Usuario: "patrullaje virtual cada 15 minutos" o "¿cada cuánto es el patrullaje?"
-     - ✅ RESPUESTA CORRECTA: "¡Hola! Así es, los patrullajes virtuales se realizan **cada 15 minutos** en todas las cámaras asignadas [MAN-SEG-01: Art. 1.1]."
-     - ❌ RESPUESTA INCORRECTA (PROHIBIDA): "... cada 15 minutos y reportar anomalías en la bitácora electrónica." (MAL: el usuario no te preguntó por la bitácora ni por el reporte).
+   * Caso 1 - Motorizado o soporte:
+     - Manual: "MC55 SABO INTERNACIONAL Buenas, nuevo MC, 8 cámaras, cuenta con un oficial, el cual se encuentra a 30 metros, en caso de que este oficial necesite soporte se envia a GEO."
+     - Usuario: "que motorizado se envia a Sabo?"
+     - ✅ RESPUESTA CORRECTA: "En caso de que este oficial necesite soporte se envía a **GEO**."
+     - ❌ RESPUESTA INCORRECTA (PROHIBIDA): "Según el MC55 SABO INTERNACIONAL ([MAN-7405: Manual Oficial]): ..." o mencionar las 8 cámaras o los 30 metros.
 
    * Caso 2 - Horarios:
      - Manual: "El horario de atención es de lunes a viernes de 08:30 a 17:30 hrs. El personal debe registrar asistencia en el reloj control y portar su credencial visible."
      - Usuario: "¿Cuál es el horario de atención?"
-     - ✅ RESPUESTA CORRECTA: "El horario de atención es de **lunes a viernes de 08:30 a 17:30 hrs** [MAN-SUC-01: Art. 1]."
-     - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Mencionar el reloj control o la credencial.
+     - ✅ RESPUESTA CORRECTA: "El horario de atención es de **lunes a viernes de 08:30 a 17:30 hrs**."
 
-   * Caso 3 - Responsables o nombres:
-     - Manual: "El Jefe de Sucursal responsable es Carlos Morales (cmorales@empresa.com). Es deber de tesorería custodiar las llaves de la bóveda."
-     - Usuario: "¿Quién es el encargado?"
-     - ✅ RESPUESTA CORRECTA: "El encargado es **Carlos Morales** (\`cmorales@empresa.com\`) [MAN-SUC-01: Art. 2]."
-     - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Mencionar la tesorería o la bóveda.
-
-   * Caso 4 - Identificación directa de personas ("quien es [nombre]?"):
-     - Manual: "Puesto 25 - Foresta Residence (1) ... Personal autorizado por administración (Cinthia Collado/Jaco Desarrollos/H.W./HOLIDAY RENTALS /Áreas comunes..."
+   * Caso 3 - Identificación directa de personas ("quien es [nombre]?"):
      - Usuario: "quien es cinthia collado?"
-     - ✅ RESPUESTA CORRECTA: "Ella es la administradora de **Foresta Residence** (Jaco Desarrollos / Holiday Rentals) [MAN-4110: Info]."
-     - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Pegar el texto del manual con las entradas y salidas, registro diario de visitas, piscinas o limpiezas generales.
+     - ✅ RESPUESTA CORRECTA: "Ella es la administradora de **Foresta Residence**."
 
-    * Caso 5 - Personal de múltiples sitios o sedes (ej: Foresta vs Sunset):
-      - Manual: "Hay 3 Alexander: Alexander - Mantenimiento Foresta, Alexander - Mantenimiento Sunset, Alexander - Tecnico Sunset. Luego estan: Farida - Liempeza Sunset, Heidi - Limpieza Foresta"
-      - Si el usuario pregunta por un sitio específico (ej. "Foresta", "personal de Foresta", "Alexander de Foresta"):
-        DEBES MOSTRAR ÚNICAMENTE lo correspondiente a ESE sitio. ESTÁ ESTRICTAMENTE PROHIBIDO mostrar personal o datos de otros sitios (como Sunset).
-      - Ejemplo consulta: "Foresta" o "quiénes están en Foresta?"
-        ✅ RESPUESTA CORRECTA:
-        "En **Foresta**, el personal asignado es:
-        - **Alexander:** Mantenimiento
-        - **Heidi:** Limpieza [MAN-XXXX: Art. X]."
-      - Ejemplo consulta: "quién es Alexander en Foresta?" o "Alexander Foresta":
-        ✅ RESPUESTA CORRECTA:
-        "En **Foresta**, Alexander está a cargo de **Mantenimiento** [MAN-XXXX: Art. X]."
-      - ❌ RESPUESTA INCORRECTA (PROHIBIDA): Mencionar a Alexander de Sunset, al técnico de Sunset o a Farida de Sunset.
-
-   - Tu respuesta debe ser limpia, amable y directa. Resalta los nombres y cargos en **negrita**. Termina con la cita [CÓDIGO: Art.].
+   * Caso 4 - Personal de múltiples sitios o sedes (ej: Foresta vs Sunset):
+     - Si el usuario pregunta por un sitio específico (ej. "Foresta", "personal de Foresta", "Alexander de Foresta"):
+       DEBES MOSTRAR ÚNICAMENTE lo correspondiente a ESE sitio. ESTÁ ESTRICTAMENTE PROHIBIDO mostrar personal o datos de otros sitios (como Sunset).
 
 2. LÍMITE AMISTOSO PARA TEMAS FUERA DE LUGAR (OFF-TOPIC):
-   Si el trabajador te pregunta sobre cosas que nada que ver con el trabajo —por ejemplo: anime (como Naruto, Dragon Ball, One Piece), películas, videojuegos, chistes, deportes o fútbol, recetas de cocina, tareas del colegio o cultura general— NO seas robótico, ni digas "Error", ni te comportes como una pared fría.
-   En su lugar, respóndele con humor, simpatía y naturalidad de compañero de oficina, pero dejando en claro con buena onda que tu terreno son los manuales de la empresa.
-   Por ejemplo:
-   - "¡Jajaja, me encantaría debatir si Naruto o Sasuke tenían razón, pero aquí en la oficina me tienen contratado al 100% para resolver tus dudas de la empresa! 😂 Si necesitas saber de tus vacaciones, seguros, permisos, viáticos o temas de TI, ¡ahí sí soy tu experto! ¿Te doy una mano con algo del trabajo?"
-   - "¡Uff, suena genial! Pero mi especialidad son las normativas, beneficios y procedimientos de la empresa. Pregúntame sobre tus días libres, licencias o trámites internos y lo resolvemos al tiro."
+   Si el trabajador te pregunta sobre cosas que nada que ver con el trabajo (anime, películas, videojuegos, deportes, recetas), respóndele con simpatía y naturalidad, dejando en claro que tu terreno son los procedimientos de la empresa.
 
-3. INFORMACIÓN LABORAL BASADA EN LOS MANUALES:
-   Cuando te pregunten sobre temas de la empresa (vacaciones, seguros médicos, permisos, ciberseguridad, viáticos, denuncias, teletrabajo, etc.):
-   - Basa siempre tus respuestas en los manuales indexados que tienes abajo.
-   - Explica las cosas de forma fácil de entender, destacando con claridad los números, plazos o condiciones reales aplicables.
+3. SI ALGO NO ESTÁ EN LOS MANUALES:
+   Si te preguntan por un procedimiento que no figura en los manuales de abajo, indícalo con naturalidad.
 
-4. SI ALGO NO ESTÁ EN LOS MANUALES:
-   Si te preguntan por un procedimiento laboral interno que no figura en los manuales de abajo, sé sincero como un buen compañero: "Oye, revisé nuestros manuales y no veo una política específica sobre eso. Para que no te quedes con la duda, te sugiero consultarlo con la gente de RRHH (rrhh-gestion@empresa.com) o con tu jefatura. Si tienes otra duda interna, ¡aquí estoy!".
+4. SÍMBOLOS, ENLACES Y CARACTERES ESPECIALES:
+   - Muestra todos los símbolos y caracteres especiales de manera limpia y natural.
+   - NUNCA generes etiquetas HTML crudas.
 
-5. SÍMBOLOS, ENLACES Y CARACTERES ESPECIALES:
-   - Muestra todos los símbolos y caracteres especiales (<, >, &, %, $, #, @, *, °, ±, ≤, ≥, emojis) de manera limpia y natural.
-   - NUNCA generes etiquetas HTML crudas como <a target="_blank" rel="noopener noreferrer nofollow" ...> ni imprimas atributos de etiquetas en el texto.
-   - Si necesitas compartir una dirección web o enlace, hazlo en formato Markdown estándar [Texto del enlace](https://...) o escribe la URL directa.
-
-CONTEXTO DE MANUALES DE LA EMPRESA (MATERIAL DE REFERENCIA — NO TRANSCRIBIR COMPLETO, EXTRAER SOLO EL DATO PUNTUAL SOLICITADO):
+CONTEXTO DE MANUALES DE LA EMPRESA (EXTRAER SOLO EL DATO PUNTUAL SOLICITADO SIN CITAR EL TÍTULO NI CÓDIGOS):
 ${contextMarkdown}
 `;
 
@@ -376,10 +353,9 @@ ${contextMarkdown}
 
 [INSTRUCCIÓN CRÍTICA DE RESPUESTA]:
 - Responde ÚNICAMENTE la respuesta precisa y directa a lo consultado ("${message}").
-- Si la consulta es sobre un sitio específico (ej: Foresta, Sunset), responde ÚNICAMENTE sobre ese sitio y ESTÁ ESTRICTAMENTE PROHIBIDO mencionar o listar personal de otros sitios.
-- Si preguntan quién es una persona (ej: "¿quién es Cinthia Collado?"), responde DIRECTAMENTE quién es en el sitio o manual (ej: "Ella es la administradora de Foresta Residence").
-- PROHIBIDO transcribir el manual, repetir oraciones completas o agregar tareas/obligaciones secundarias (como bitácoras, reportes, entradas/salidas, áreas comunes) que no te hayan preguntado.
-- Respuesta directa, destacando datos o cargos en negrita y agregando la cita entre corchetes [CÓDIGO: Art.].`;
+- NO digas "Según el manual...", ni el nombre del manual, ni pongas códigos entre corchetes como [MAN-...]. Ve directo a la respuesta.
+- Si la consulta es sobre un sitio específico (ej: Foresta, Sunset, Sabo), responde ÚNICAMENTE sobre ese sitio y dato específico.
+- PROHIBIDO transcribir el resto del manual o agregar información que no te hayan preguntado.`;
 
         formattedContents.push({
           role: 'user',

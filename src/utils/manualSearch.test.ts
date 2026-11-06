@@ -73,11 +73,11 @@ test('searchManuals retrieves alarm procedure for security alarm queries', () =>
   assert.equal(results[0].manual.code, 'MAN-SEG-03');
 });
 
-test('buildManualContext generates structured context with manual code and title', () => {
+test('buildManualContext generates structured context with manual title and extracted data', () => {
   const results = searchManuals('cámaras de seguridad', DEFAULT_MANUALS);
   const context = buildManualContext(results);
-  assert.ok(context.includes('MAN-SEG-01'));
-  assert.ok(context.includes('Art. 1.1'));
+  assert.ok(context.includes('REFERENCIA 1'));
+  assert.ok(context.includes('Título:'));
 });
 
 test('generateLocalGroundedAnswer yields grounded answers with valid citations', () => {
@@ -259,7 +259,7 @@ test('generateLocalGroundedAnswer responds directly with Ella es la administrado
   const results = searchManuals('quien es cinthia collado?', [mockManual]);
   const { answer } = generateLocalGroundedAnswer('quien es cinthia collado?', results, 'direct');
 
-  assert.strictEqual(answer, 'Ella es la administradora de **Foresta Residence** [MAN-4110: Info].');
+  assert.strictEqual(answer, 'Ella es la administradora de **Foresta Residence**.');
   assert.ok(!answer.includes('entradas y salidas'));
   assert.ok(!answer.includes('diario de visitas'));
   assert.ok(!answer.includes('piscinas'));
@@ -408,7 +408,7 @@ El camión recolector de basura pasa los martes y jueves.`;
 
 test('extractRelevantExcerpt extracts ONLY the specific comma-separated clause for MC55 SABO INTERNACIONAL', () => {
   const saboManualText =
-    'MC55 SABO INTERNACIONAL Buenas, nuevo MC, 8 cámaras, cuenta con un oficial, el cual se encuentra a 30 metros, en caso de que este oficial necesite soporte se envia a GEO.';
+    'MC55 SABO INTERNACIONAL Buenas, nuevo MC, 8 cámaras, cuenta con un oficial, el cual se encuentra a 30 metros, en caso de que este oficial necesite soporte se envia a GEO. Principal actividad a observar, cualquier tipo de actividad fuera de lo normal en XEOMA hay 3 camaras (MC55-01, MC55-02, MC55-03) en las cuales se ve donde ingresan personas sin autorización, estar al tanto de esto. Es un servicio de 06:00 a 18:00.';
 
   // 1. Query: que motorizado se envia a Sabo?
   const exMotorizado = extractRelevantExcerpt(
@@ -443,6 +443,80 @@ test('extractRelevantExcerpt extracts ONLY the specific comma-separated clause f
   assert.ok(exMetros.includes('30 metros'), `Expected 30 metros in "${exMetros}"`);
   assert.ok(!exMetros.includes('8 cámaras'), `Must not include 8 cámaras in "${exMetros}"`);
   assert.ok(!exMetros.includes('GEO'), `Must not include GEO in "${exMetros}"`);
+
+  // 4. Full local answer must NOT include "Según el" or "[MAN-"
+  const saboManual: ManualDocument = {
+    id: 'man-7405',
+    title: 'MC55 SABO INTERNACIONAL',
+    code: 'MAN-7405',
+    category: 'operaciones',
+    version: '1.0',
+    updatedDate: '2026-11-06',
+    department: 'Operaciones',
+    iconName: 'FileText',
+    summary: saboManualText,
+    sections: [
+      {
+        id: 'sec-sabo',
+        articleNumber: 'Manual Oficial',
+        title: 'MC55 SABO INTERNACIONAL',
+        tags: ['sabo', 'mc55'],
+        content: saboManualText
+      }
+    ]
+  };
+  const saboResults = searchManuals('que motorizado se envia a Sabo?', [saboManual]);
+  const saboAnswer = generateLocalGroundedAnswer('que motorizado se envia a Sabo?', saboResults, 'direct');
+  assert.strictEqual(saboAnswer.answer, 'En caso de que este oficial necesite soporte se envia a GEO.');
+  assert.ok(!saboAnswer.answer.includes('Según el'));
+  assert.ok(!saboAnswer.answer.includes('MAN-7405'));
+
+  // 5. Query: horario de sabo -> must extract "Es un servicio de 06:00 a 18:00."
+  const saboHorarioResults = searchManuals('horario de sabo', [saboManual]);
+  const saboHorarioAnswer = generateLocalGroundedAnswer('horario de sabo', saboHorarioResults, 'direct');
+  assert.strictEqual(saboHorarioAnswer.answer, 'Es un servicio de 06:00 a 18:00.');
+});
+
+test('extractRelevantExcerpt correctly isolates address and staff lists in Foresta manual', () => {
+  const forestaManualText = `
+Foresta Residence / Puesto 25.0 / SI -01 En primer lugar, se debe controlar las entradas y salidas del puesto.
+Al registrar el staff de Foresta, Jairo, Heidi o Alexander, Tambien a veces puede estar jordan.
+En la zona del rancho, hay parqueos extras para visitas. Pese a estar en el exterior, es un parqueo privado.
+Provincia: Puntarenas Cantón : Garabito Distrito: Jaco Dirección : 3ra entrada Quebrada Seca a mano izquierda, Calle la montaña. https://maps.app.goo.gl/test
+`;
+
+  const forestaManual: ManualDocument = {
+    id: 'man-foresta',
+    title: 'Puesto 25 - Foresta Residence (1)',
+    code: 'MAN-9567',
+    category: 'seguridad',
+    version: '1.0',
+    updatedDate: '2026-11-06',
+    department: 'Seguridad',
+    iconName: 'FileText',
+    summary: forestaManualText,
+    sections: [
+      {
+        id: 'sec-foresta',
+        articleNumber: 'Manual Oficial',
+        title: 'Puesto 25 - Foresta Residence (1)',
+        tags: ['foresta', 'puesto 25'],
+        content: forestaManualText
+      }
+    ]
+  };
+
+  // 1. Address query
+  const addrResults = searchManuals('direccion de foresta', [forestaManual]);
+  const addrAnswer = generateLocalGroundedAnswer('direccion de foresta', addrResults, 'direct');
+  assert.ok(addrAnswer.answer.includes('3ra entrada Quebrada Seca'), `Expected address in "${addrAnswer.answer}"`);
+  assert.ok(!addrAnswer.answer.includes('parqueo privado'), `Address should not include unrelated parking text in "${addrAnswer.answer}"`);
+
+  // 2. Staff query
+  const staffResults = searchManuals('quien es el staff de foresta?', [forestaManual]);
+  const staffAnswer = generateLocalGroundedAnswer('quien es el staff de foresta?', staffResults, 'direct');
+  assert.ok(staffAnswer.answer.includes('Jairo') && staffAnswer.answer.includes('Heidi'), `Expected staff members in "${staffAnswer.answer}"`);
+  assert.ok(!staffAnswer.answer.includes('figura en'), `Should not contain robotic "figura en" in "${staffAnswer.answer}"`);
 });
 
 
