@@ -1,4 +1,5 @@
 import { Citation, ManualDocument, ManualSection, SearchResult } from '../types/manual';
+import { cleanRawHtmlTags } from './textFormatting';
 
 const SPANISH_STOPWORDS = new Set([
   'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'del', 'se', 'las', 'por', 'un', 'para',
@@ -109,6 +110,81 @@ export function getConversationalResponse(intent: ConversationalIntent, companyN
   }
 }
 
+const GENERIC_QUERY_VERBS = new Set([
+  'dice', 'decir', 'hace', 'hacer', 'hago', 'hacen', 'hagamos', 'pasa', 'pasar',
+  'tiene', 'tienen', 'tener', 'debe', 'deben', 'debo', 'debemos', 'puede', 'pueden',
+  'puedo', 'podemos', 'cual', 'cuales', 'quien', 'quienes', 'cuanto', 'cuantos',
+  'cuantas', 'donde', 'cuando', 'como', 'explica', 'indica', 'menciona', 'habla',
+  'trata', 'existe', 'estan', 'esta', 'este', 'corresponde', 'corresponden',
+  'necesito', 'quiero', 'saber', 'pregunta', 'consultar', 'consulta', 'informacion',
+  'manual', 'procedimiento', 'protocolo', 'reglamento', 'puesto', 'articulo', 'seccion'
+]);
+
+/**
+ * Extracts a Spanish lexical stem/root for resilient matching across plurals and verb conjugations
+ * (e.g. "fumigan" <-> "fumigar", "piscinas" <-> "piscina", "limpio" <-> "limpiezas")
+ */
+export function getSpanishStem(word: string): string {
+  const w = normalizeText(word);
+  if (w.length <= 4) return w;
+
+  const suffixes = [
+    'aciones', 'iciones', 'amientos', 'imientos',
+    'acion', 'icion', 'amiento', 'imiento',
+    'adores', 'adoras', 'antes', 'ientes',
+    'ador', 'adora', 'ante', 'iente',
+    'ando', 'iendo', 'aron', 'ieron', 'aban', 'aran', 'eran', 'iran',
+    'mente', 'anzas', 'anza', 'ezas', 'eza', 'cias', 'cia',
+    'ar', 'er', 'ir', 'an', 'en', 'as', 'es', 'os', 'a', 'e', 'o', 's'
+  ];
+
+  for (const suffix of suffixes) {
+    if (w.endsWith(suffix) && w.length - suffix.length >= 4) {
+      return w.slice(0, w.length - suffix.length);
+    }
+  }
+
+  return w.slice(0, Math.max(4, w.length - 2));
+}
+
+/**
+ * Checks whether a keyword matches inside normalized text (exact, singular/plural, or Spanish stem)
+ * Returns match quality multiplier: 1.0 (exact), 0.9 (plural/singular), 0.8 (stem), or 0 (no match)
+ */
+export function matchKeywordScore(normText: string, textTokens: string[], kw: string): number {
+  if (!kw || !normText) return 0;
+  if (normText.includes(kw)) return 1.0;
+
+  if (kw.length >= 4) {
+    const singular = kw.endsWith('es') && kw.length >= 5
+      ? kw.slice(0, -2)
+      : kw.endsWith('s')
+        ? kw.slice(0, -1)
+        : kw;
+
+    if (singular.length >= 4) {
+      for (const token of textTokens) {
+        if (token === singular || token === `${singular}s` || token === `${singular}es` || token.startsWith(singular)) {
+          return 0.9;
+        }
+      }
+    }
+  }
+
+  if (kw.length >= 5) {
+    const stem = getSpanishStem(kw);
+    if (stem.length >= 4) {
+      for (const token of textTokens) {
+        if (token.length >= 4 && (token.startsWith(stem) || getSpanishStem(token) === stem)) {
+          return 0.8;
+        }
+      }
+    }
+  }
+
+  return 0;
+}
+
 /**
  * Searches manuals using weighted keyword and phrase scoring
  * ONLY searches when the message has meaningful keywords and is not a pure social greeting/thanks.
@@ -133,31 +209,75 @@ export function searchManuals(
   const results: SearchResult[] = [];
 
   for (const manual of manuals) {
-    for (const section of manual.sections || []) {
-      const normTitle = normalizeText(section.title || '');
+    const rawSections: ManualSection[] =
+      Array.isArray(manual.sections) && manual.sections.length > 0
+        ? manual.sections
+        : [
+            {
+              id: `${manual.id}-main`,
+              articleNumber: 'Manual Oficial',
+              title: manual.title,
+              content: manual.description || manual.summary || '',
+              tags: ['manual', 'oficial']
+            }
+          ];
+
+    const normManualTitle = normalizeText(manual.title || '');
+    const manualTitleTokens = normManualTitle.split(/\s+/).filter(Boolean);
+
+    for (const rawSection of rawSections) {
+      const cleanedContent = cleanRawHtmlTags(
+        rawSection.content || manual.description || manual.summary || ''
+      );
+      const section: ManualSection = {
+        ...rawSection,
+        content: cleanedContent
+      };
+
+      const normTitle = normalizeText(section.title || manual.title || '');
+      const titleTokens = normTitle.split(/\s+/).filter(Boolean);
       const normArticle = normalizeText(section.articleNumber || '');
-      const normContent = normalizeText(section.content || '');
-      const normTags = Array.isArray(section.tags) ? section.tags.map(t => normalizeText(t)).join(' ') : '';
+      const normContent = normalizeText(cleanedContent);
+      const contentTokens = normContent.split(/\s+/).filter(Boolean);
+      const normTags = Array.isArray(section.tags)
+        ? section.tags.map(t => normalizeText(t)).join(' ')
+        : '';
+      const tagTokens = normTags.split(/\s+/).filter(Boolean);
 
       let score = 0;
 
       // Exact title match bonus
-      if (normTitle.includes(normalizedQuery)) {
+      if (normTitle.includes(normalizedQuery) || normManualTitle.includes(normalizedQuery)) {
         score += 80;
       }
 
       // Exact article number match (e.g. "Art. 4.1" or "4.1")
       const isArticleCode = /^(?:art|artículo|articulo|secc|cap|\d+)/i.test(normArticle);
-      if (normArticle === normalizedQuery || (isArticleCode && (normArticle.includes(normalizedQuery) || normalizedQuery.includes(normArticle)))) {
+      if (
+        normArticle === normalizedQuery ||
+        (isArticleCode && (normArticle.includes(normalizedQuery) || normalizedQuery.includes(normArticle)))
+      ) {
         score += 100;
       }
 
-      // Keywords match across title, tags and content
+      // Keywords match across title, manual title, tags and content (including Spanish stems)
       for (const kw of keywords) {
-        if (normTitle.includes(kw)) score += 25;
-        if (normTags.includes(kw)) score += 20;
-        if (normContent.includes(kw)) score += 8;
-        if (normArticle.includes(kw)) score += 30;
+        const isGeneric = GENERIC_QUERY_VERBS.has(kw);
+        const weightMultiplier = isGeneric ? 0.35 : 1.0;
+
+        const titleMatch = Math.max(
+          matchKeywordScore(normTitle, titleTokens, kw),
+          matchKeywordScore(normManualTitle, manualTitleTokens, kw)
+        );
+        if (titleMatch > 0) score += 25 * titleMatch * weightMultiplier;
+
+        const tagMatch = matchKeywordScore(normTags, tagTokens, kw);
+        if (tagMatch > 0) score += 20 * tagMatch * weightMultiplier;
+
+        const contentMatch = matchKeywordScore(normContent, contentTokens, kw);
+        if (contentMatch > 0) score += 12 * contentMatch * weightMultiplier;
+
+        if (normArticle.includes(kw)) score += 30 * weightMultiplier;
       }
 
       // Department matching
@@ -166,17 +286,7 @@ export function searchManuals(
       }
 
       if (score > 0) {
-        // Build readable snippet centered on matching term
-        let snippet = (section.content || '').slice(0, 180);
-        for (const kw of keywords) {
-          const idx = normContent.indexOf(kw);
-          if (idx !== -1) {
-            const start = Math.max(0, idx - 40);
-            const end = Math.min((section.content || '').length, idx + 140);
-            snippet = (start > 0 ? '...' : '') + (section.content || '').slice(start, end) + '...';
-            break;
-          }
-        }
+        const snippet = extractRelevantExcerpt(cleanedContent, query, section.keyPoints).slice(0, 220);
 
         results.push({
           manual,
@@ -194,7 +304,8 @@ export function searchManuals(
 }
 
 /**
- * Builds formatted context markdown for Gemini RAG prompt
+ * Builds formatted context markdown for Gemini RAG prompt.
+ * Always supplies the laser-extracted relevant excerpt rather than dumping entire manuals.
  */
 export function buildManualContext(results: SearchResult[], query?: string): string {
   if (results.length === 0) {
@@ -202,30 +313,21 @@ export function buildManualContext(results: SearchResult[], query?: string): str
   }
 
   return results
+    .slice(0, 2)
     .map((res, index) => {
       const { manual, section } = res;
-      const targetedData = query ? extractRelevantExcerpt(section.content || '', query, section.keyPoints) : '';
-
-      // CRITICAL: When a concise targeted excerpt was extracted, provide ONLY that excerpt to prevent the LLM
-      // from regurgitating unrelated paragraphs (such as entry logs, pool cleaning, or unrequested procedures).
-      if (targetedData && (targetedData.length < (section.content || '').length * 0.85 || targetedData.length <= 350)) {
-        return `### [REFERENCIA ${index + 1}]
-Manual: ${manual.title} (${manual.code}, v${manual.version})
-Departamento: ${manual.department}
-Artículo: ${section.articleNumber} - "${section.title}"
-Identificador: ${manual.id}#${section.id}
-DATO EXACTO DEL MANUAL QUE RESPONDE LA PREGUNTA (ENTREGAR EXCLUSIVAMENTE ESTE DATO):
-"${targetedData}"
----`;
-      }
+      const cleanedContent = cleanRawHtmlTags(section.content || '');
+      const targetedData = query
+        ? extractRelevantExcerpt(cleanedContent, query, section.keyPoints)
+        : cleanedContent.slice(0, 300);
 
       return `### [REFERENCIA ${index + 1}]
 Manual: ${manual.title} (${manual.code}, v${manual.version})
 Departamento: ${manual.department}
 Artículo: ${section.articleNumber} - "${section.title}"
 Identificador: ${manual.id}#${section.id}
-${targetedData ? `>>> DATO EXACTO DEL MANUAL QUE RESPONDE LA PREGUNTA DEL USUARIO <<<\n"${targetedData}"\n` : ''}Texto de Referencia del Artículo:
-${section.content}
+DATO EXACTO DEL MANUAL QUE RESPONDE LA PREGUNTA (RESPONDER EXCLUSIVAMENTE CON ESTE DATO, PROHIBIDO AGREGAR OTROS PUNTOS):
+"${targetedData}"
 ---`;
     })
     .join('\n\n');
@@ -277,7 +379,8 @@ interface SubtitleBlock {
 }
 
 /**
- * Splits manual content into discrete subtitle blocks if headers/sections exist
+ * Splits manual content into discrete subtitle blocks when real headers/sections exist,
+ * WITHOUT treating numbered (1., 2.) or alphabetical (a., b.) list items as empty headings.
  */
 function splitIntoSubtitleBlocks(content: string): SubtitleBlock[] {
   const lines = content.split('\n');
@@ -285,7 +388,25 @@ function splitIntoSubtitleBlocks(content: string): SubtitleBlock[] {
   let currentHeading: string | undefined = undefined;
   let currentLines: string[] = [];
 
-  const headingPattern = /^(?:#{1,6}\s+|(?:Art[íi]culo\s+\d+|Cap[íi]tulo\s+[IVXLCDM\d]+|\d+\.|\d+\.\d+\.?|[A-Za-z]\))\s*[:.-]?|[A-ZÁÉÍÓÚ\s\d]{3,40}:)(.+)?$/i;
+  const isHeadingLine = (trimmed: string): boolean => {
+    if (!trimmed || trimmed.length > 85) return false;
+    // 1. Markdown heading (#, ##, ###)
+    if (/^#{1,6}\s+.+/.test(trimmed)) return true;
+    // 2. Formal Article / Chapter / Section header
+    if (/^(?:Art[íi]culo|Cap[íi]tulo|Secci[óo]n|Cl[áa]usula)\s+[IVXLCDM\d]+[:.-]?\s*.*/i.test(trimmed)) {
+      return true;
+    }
+    // 3. Standalone bold title line (**Subtítulo** or **Subtítulo:**)
+    if (/^\*\*[^*]{3,75}\*\*:?$/.test(trimmed)) return true;
+    // 4. Short uppercase or title-colon header (NOT starting with list item 1. / a. / •)
+    if (
+      !/^(?:\d+[.)]|[a-zA-Z][.)]|[•●▪▸➤\-*])\s+/.test(trimmed) &&
+      /^[A-ZÁÉÍÓÚÑ][^.!?\n]{2,55}:$/.test(trimmed)
+    ) {
+      return true;
+    }
+    return false;
+  };
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -294,16 +415,21 @@ function splitIntoSubtitleBlocks(content: string): SubtitleBlock[] {
       continue;
     }
 
-    const match = trimmed.match(headingPattern);
-    if (match && trimmed.length < 80) {
+    if (isHeadingLine(trimmed)) {
       if (currentLines.some(l => l.trim().length > 0)) {
         blocks.push({
           heading: currentHeading,
           text: currentLines.join('\n').trim()
         });
+        currentLines = [];
+      } else if (currentHeading) {
+        currentLines.push(currentHeading);
       }
-      currentHeading = trimmed.replace(/^#+\s*/, '').replace(/:$/, '').trim();
-      currentLines = [];
+      currentHeading = trimmed
+        .replace(/^#{1,6}\s*/, '')
+        .replace(/^\*\*|\*\*:?$/g, '')
+        .replace(/:$/, '')
+        .trim();
     } else {
       currentLines.push(line);
     }
@@ -313,6 +439,11 @@ function splitIntoSubtitleBlocks(content: string): SubtitleBlock[] {
     blocks.push({
       heading: currentHeading,
       text: currentLines.join('\n').trim()
+    });
+  } else if (currentHeading) {
+    blocks.push({
+      heading: undefined,
+      text: currentHeading
     });
   }
 
@@ -438,7 +569,57 @@ export function filterRosterEntriesByQuery(entries: string[], query: string): st
 }
 
 /**
- * Extracts only the specific, relevant data point (schedule, name, amount, or concise sentence)
+ * Splits a block of text into granular sentences and list items (1., a., •, ➤, lines)
+ * while preserving list prefixes (e.g., "1. Paso uno") and attaching short colon headers to their value.
+ */
+function splitIntoGranularSegments(text: string): string[] {
+  const cleaned = cleanRawHtmlTags(text);
+  const rawLines = cleaned
+    .replace(/\s*[➤►▸➜➔➡●○▪▫■□✓✔√]+\s*/g, '\n')
+    .replace(/\s+\/\s*(?=[A-ZÁÉÍÓÚÑ])/g, '\n')
+    .replace(/(?<=[.!?])\s+(?=(?:\d{1,2}[.)]|[a-zA-Z][.)]|•)\s+)/g, '\n')
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const segments: string[] = [];
+
+  for (let i = 0; i < rawLines.length; i++) {
+    let line = rawLines[i];
+
+    if (
+      line.endsWith(':') &&
+      line.length < 75 &&
+      i + 1 < rawLines.length &&
+      !/^(?:\d+[.)]|[a-zA-Z][.)]|•)\s+/.test(rawLines[i + 1])
+    ) {
+      line = `${line} ${rawLines[i + 1]}`;
+      i++;
+    }
+
+    const listPrefixMatch = line.match(/^((?:\d{1,2}[.)]|[a-zA-Z][.)]|•|-)\s+)(.+)$/);
+    if (listPrefixMatch) {
+      segments.push(line);
+      continue;
+    }
+
+    const subSentences = line
+      .split(/(?<!\b(?:[0-9]{1,3}|[a-zA-Z]|Art|Cap|Secc|Sr|Sra|Dr|Dra|Ing|Lic|No|Nro|Av|Tel|Ext))(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿¡0-9•*])|;\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 3);
+
+    if (subSentences.length > 1) {
+      segments.push(...subSentences);
+    } else if (line.length > 3) {
+      segments.push(line);
+    }
+  }
+
+  return segments;
+}
+
+/**
+ * Extracts only the specific, relevant data point (schedule, name, amount, list item, or concise sentence)
  * answering the user's query, filtering out unrelated subtitles and preventing full manual dumps.
  */
 export function extractRelevantExcerpt(
@@ -446,11 +627,12 @@ export function extractRelevantExcerpt(
   query: string,
   keyPoints?: string[]
 ): string {
-  if (!content) return '';
+  const cleanedContent = cleanRawHtmlTags(content || '');
+  if (!cleanedContent) return '';
 
   // 0. Site-specific roster extraction:
   // If the document contains multiple person-role entries across different sites (e.g. Foresta vs Sunset)
-  const rosterEntries = parseRosterEntries(content);
+  const rosterEntries = parseRosterEntries(cleanedContent);
   if (rosterEntries.length >= 2) {
     const filteredRoster = filterRosterEntriesByQuery(rosterEntries, query);
     if (filteredRoster.length > 0 && filteredRoster.length < rosterEntries.length) {
@@ -461,17 +643,21 @@ export function extractRelevantExcerpt(
   const keywords = extractKeywords(query);
   const entityType = detectTargetEntityType(query);
 
+  const specificKeywords = keywords.filter(kw => !GENERIC_QUERY_VERBS.has(kw));
+  const activeKeywords = specificKeywords.length > 0 ? specificKeywords : keywords;
+
   // 1. If key points exist, see if any key point directly answers the query
-  if (keyPoints && keyPoints.length > 0 && keywords.length > 0) {
+  if (keyPoints && keyPoints.length > 0 && activeKeywords.length > 0) {
     const matchedPoints = keyPoints.filter(kp => {
       const normKp = normalizeText(kp);
-      const kwMatch = keywords.some(kw => normKp.includes(kw));
+      const kpTokens = normKp.split(/\s+/).filter(Boolean);
+      const kwMatch = activeKeywords.some(kw => matchKeywordScore(normKp, kpTokens, kw) >= 0.8);
       if (!kwMatch) return false;
       if (entityType === 'schedule') {
         return /\b(\d{1,2}:\d{2}|\d+\s*(am|pm|hrs|horas|minutos|min)|turno|horario|cada\s+\d+)\b/i.test(normKp);
       }
       if (entityType === 'person') {
-        return /\b(responsable|encargad|jefe|coordinador|oficial|contacto|correo|email)\b/i.test(normKp);
+        return /\b(responsable|encargad|jefe|coordinador|oficial|contacto|correo|email|administrad|autorizad)\b/i.test(normKp);
       }
       if (entityType === 'amount') {
         return /\b(\d+|plazo|anticipacion|dias|monto|\$)\b/i.test(normKp);
@@ -485,9 +671,10 @@ export function extractRelevantExcerpt(
   }
 
   // 2. Break down into subtitle blocks if document has subsections
-  const blocks = splitIntoSubtitleBlocks(content);
-  let targetText = content;
+  const blocks = splitIntoSubtitleBlocks(cleanedContent);
+  let targetText = cleanedContent;
   let targetHeading: string | undefined = undefined;
+  let matchedByHeadingOnly = false;
 
   // Helper to strip unrelated secondary clauses (e.g. log reporting, secondary obligations)
   const refineClause = (text: string): string => {
@@ -502,9 +689,11 @@ export function extractRelevantExcerpt(
 
     for (const cl of clauses) {
       const norm = normalizeText(cl);
+      const tokens = norm.split(/\s+/).filter(Boolean);
       let score = 0;
       for (const kw of keywords) {
-        if (norm.includes(kw)) score += 10;
+        const m = matchKeywordScore(norm, tokens, kw);
+        if (m > 0) score += (GENERIC_QUERY_VERBS.has(kw) ? 4 : 14) * m;
       }
       if (entityType === 'schedule' && /\b(\d{1,2}:\d{2}|\d+\s*(am|pm|hrs|horas|minutos|min)|turno|horario|cada\s+\d+)\b/i.test(norm)) {
         score += 25;
@@ -529,73 +718,133 @@ export function extractRelevantExcerpt(
   };
 
   if (blocks.length > 1) {
-    // Score blocks based on heading relevance and content relevance
     let bestBlockScore = -1;
     let bestBlock = blocks[0];
+    let bestHeadingScore = 0;
 
     for (const b of blocks) {
       let bScore = 0;
+      let hScore = 0;
       const normH = b.heading ? normalizeText(b.heading) : '';
+      const hTokens = normH.split(/\s+/).filter(Boolean);
       const normT = normalizeText(b.text);
+      const tTokens = normT.split(/\s+/).filter(Boolean);
 
       for (const kw of keywords) {
-        if (normH.includes(kw)) bScore += 35;
-        if (normT.includes(kw)) bScore += 8;
+        const isGeneric = GENERIC_QUERY_VERBS.has(kw);
+        const hMatch = matchKeywordScore(normH, hTokens, kw);
+        if (hMatch > 0) {
+          const pts = (isGeneric ? 10 : 38) * hMatch;
+          bScore += pts;
+          hScore += pts;
+        }
+        const tMatch = matchKeywordScore(normT, tTokens, kw);
+        if (tMatch > 0) {
+          bScore += (isGeneric ? 3 : 14) * tMatch;
+        }
       }
 
       if (entityType === 'schedule') {
-        if (/\b(horario|hora|jornada|turno|atencion|apertura|cierre)\b/i.test(normH)) bScore += 45;
+        if (/\b(horario|hora|jornada|turno|atencion|apertura|cierre)\b/i.test(normH)) {
+          bScore += 45;
+          hScore += 45;
+        }
         if (/\b(\d{1,2}:\d{2}|\d+\s*(hrs|horas|am|pm)|lunes a viernes)\b/i.test(normT)) bScore += 25;
       } else if (entityType === 'person') {
-        if (/\b(responsable|encargad|contacto|jefe|personal|equipo)\b/i.test(normH)) bScore += 45;
+        if (/\b(responsable|encargad|contacto|jefe|personal|equipo)\b/i.test(normH)) {
+          bScore += 45;
+          hScore += 45;
+        }
         if (/\b(@|responsable|encargad|jefe|coordinador)\b/i.test(normT)) bScore += 25;
       } else if (entityType === 'amount') {
-        if (/\b(plazo|anticipacion|monto|valor|viatico|feriado|vacacion)\b/i.test(normH)) bScore += 45;
+        if (/\b(plazo|anticipacion|monto|valor|viatico|feriado|vacacion)\b/i.test(normH)) {
+          bScore += 45;
+          hScore += 45;
+        }
         if (/\b(\d+\s*(dias|días|meses|semanas)|\$\s*\d+)\b/i.test(normT)) bScore += 25;
       }
 
       if (bScore > bestBlockScore) {
         bestBlockScore = bScore;
         bestBlock = b;
+        bestHeadingScore = hScore;
       }
     }
 
     if (bestBlockScore > 10) {
       targetText = bestBlock.text;
       targetHeading = bestBlock.heading;
-
-      // If the matched block is already concise (under 320 chars, e.g. 1-2 sentences), return it directly!
-      if (targetText.length <= 320) {
-        return targetText.trim();
-      }
+      matchedByHeadingOnly = bestHeadingScore >= 30;
     }
   }
 
-  // 3. Entity-specific sentence and bullet item extraction
-  // Split targetText into clean segments using sentence endings, newlines, bullet symbols (➤, •, etc.) and topic slashes
-  const segmentPattern = /(?:\s*[➤►▸➜➔➡•●○▪▫■□✓✔√|\n\r]+\s*|(?<=[.!?])\s+|;\s+|\s+\/\s*(?=[A-ZÁÉÍÓÚ]))/;
-  const sentences = targetText
-    .split(segmentPattern)
-    .map(s => s.trim())
-    .filter(s => s.length > 3);
+  // 3. Granular sentence and list item extraction
+  const sentences = splitIntoGranularSegments(targetText);
 
-  const scoredSentences: { sentence: string; score: number }[] = [];
+  if (sentences.length === 0) {
+    return targetText.trim();
+  }
+
+  const kwSentenceFreq: Record<string, number> = {};
+  const firstSegmentNorm = normalizeText(sentences[0] || '');
+  const firstSegmentTokens = firstSegmentNorm.split(/\s+/).filter(Boolean);
+
+  for (const kw of keywords) {
+    let count = 0;
+    for (const s of sentences) {
+      const norm = normalizeText(s);
+      const tokens = norm.split(/\s+/).filter(Boolean);
+      if (matchKeywordScore(norm, tokens, kw) > 0) count++;
+    }
+    kwSentenceFreq[kw] = count;
+  }
+
+  const hasNonPreambleSpecificKw =
+    blocks.length === 1 &&
+    sentences.length > 2 &&
+    specificKeywords.some(
+      kw => kwSentenceFreq[kw] > 0 && matchKeywordScore(firstSegmentNorm, firstSegmentTokens, kw) === 0
+    );
+
+  const scoredSentences: {
+    sentence: string;
+    score: number;
+    index: number;
+    matchedSpecificKws: string[];
+  }[] = [];
 
   for (let i = 0; i < sentences.length; i++) {
     const s = sentences[i];
     const norm = normalizeText(s);
+    const tokens = norm.split(/\s+/).filter(Boolean);
     let score = 0;
+    const matchedSpecificKws: string[] = [];
 
     for (const kw of keywords) {
-      if (norm.includes(kw)) score += 18;
+      const m = matchKeywordScore(norm, tokens, kw);
+      if (m > 0) {
+        const isGeneric = GENERIC_QUERY_VERBS.has(kw);
+        if (isGeneric) {
+          score += 5 * m;
+        } else {
+          matchedSpecificKws.push(kw);
+          const isInPreamble = matchKeywordScore(firstSegmentNorm, firstSegmentTokens, kw) > 0;
+          if (hasNonPreambleSpecificKw && isInPreamble && sentences.length > 1) {
+            score += 6 * m;
+          } else {
+            const rarityBonus = (kwSentenceFreq[kw] || 1) === 1 ? 14 : 0;
+            score += (26 + rarityBonus) * m;
+          }
+        }
+      }
     }
 
     if (entityType === 'schedule') {
-      if (/\b(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm|hrs|horas)|de\s+\d{1,2}[:\d]*\s*a\s*\d{1,2}[:\d]*|lunes a viernes|lunes a sabado|cada\s+\d+\s*(minutos|min|hrs|horas)|turno|horario)\b/i.test(norm)) {
+      if (/\b(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm|hrs|horas)|de\s+\d{1,2}[:\d]*\s*a\s*\d{1,2}[:\d]*|lunes a viernes|lunes a sabado|martes a domingo|cada\s+\d+\s*(minutos|min|hrs|horas)|turno|horario)\b/i.test(norm)) {
         score += 35;
       }
     } else if (entityType === 'person') {
-      if (/\b(responsable|encargad[oa]|jefe|jefatura|coordinador[a]?|oficial|supervisor[a]?|gerente|operador|director[a]?|contacto|correo|email|anexo|telefono|personal autorizado|autorizad[oa])\b/i.test(norm)) {
+      if (/\b(responsable|encargad[oa]|jefe|jefatura|coordinador[a]?|oficial|supervisor[a]?|gerente|operador|director[a]?|contacto|correo|email|anexo|telefono|personal autorizado|autorizad[oa]|administrad[oa]r?[a]?)\b/i.test(norm)) {
         score += 35;
       }
       if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(s)) {
@@ -608,7 +857,7 @@ export function extractRelevantExcerpt(
     }
 
     if (score > 0) {
-      scoredSentences.push({ sentence: s, score });
+      scoredSentences.push({ sentence: s, score, index: i, matchedSpecificKws });
     }
   }
 
@@ -616,24 +865,52 @@ export function extractRelevantExcerpt(
     scoredSentences.sort((a, b) => b.score - a.score);
     const top = scoredSentences[0];
 
-    // If we have a high-confidence entity sentence, refine down to its exact clause and return!
-    if (top.score >= 15 || entityType !== 'general') {
+    if (top.score >= 12 || entityType !== 'general') {
       let result = refineClause(top.sentence);
-      
-      // Close unclosed parenthesis if segment was split
+
       if (result.includes('(') && !result.includes(')')) {
         result += ')';
       }
 
-      // If there is an immediate complementary sentence that adds critical clarification (e.g. Saturdays, email, details)
-      const topIdx = sentences.indexOf(top.sentence);
-      if (topIdx !== -1 && topIdx + 1 < sentences.length && entityType === 'general') {
-        const next = sentences[topIdx + 1];
-        if (next.length < 120 && (
-          /^(los|las|el|en|anexo|correo|telefono|contacto|nota|importante)\b/i.test(next.trim()) ||
-          /\b(sabado|domingo|festivo|excepcion|correo|anexo)\b/i.test(normalizeText(next))
-        )) {
-          result = `${result} ${next}`;
+      const coveredKws = new Set(top.matchedSpecificKws);
+      if (targetHeading && blocks.length > 1) {
+        const normH = normalizeText(targetHeading);
+        const hTokens = normH.split(/\s+/).filter(Boolean);
+        for (const kw of specificKeywords) {
+          if (matchKeywordScore(normH, hTokens, kw) > 0) {
+            coveredKws.add(kw);
+          }
+        }
+      }
+
+      const isCompoundQuery = /\b(y\s+(?:con\s+)?(?:cuant[oa]?s?|como|que|donde|cuando|quien(?:es)?|cual(?:es)?)|ademas)\b/i.test(normalizeText(query));
+
+      const secondDistinct = scoredSentences.slice(1).find(
+        cand =>
+          (cand.score >= 20 && cand.matchedSpecificKws.some(kw => !coveredKws.has(kw))) ||
+          (blocks.length > 1 && isCompoundQuery && cand.score >= top.score * 0.5)
+      );
+
+      if (secondDistinct) {
+        const secondRefined = refineClause(secondDistinct.sentence);
+        const ordered =
+          top.index < secondDistinct.index
+            ? [result, secondRefined]
+            : [secondRefined, result];
+        result = ordered.join(' ');
+      } else {
+        const topIdx = top.index;
+        if (topIdx + 1 < sentences.length) {
+          const next = sentences[topIdx + 1];
+          const normNext = normalizeText(next);
+          if (
+            next.length < 110 &&
+            ((entityType === 'schedule' && /\b(sabado|domingo|festivo|feriado|cerrado|no se atiende)\b/i.test(normNext)) ||
+              (entityType === 'general' &&
+                /^(los dias sabado|los sabados|nota:|importante:)\b/i.test(normNext)))
+          ) {
+            result = `${result} ${next}`;
+          }
         }
       }
 
@@ -644,48 +921,15 @@ export function extractRelevantExcerpt(
     }
   }
 
-  // 4. Paragraph scoring fallback for general queries
-  const rawParagraphs = targetText
-    .split(/\n\s*\n/)
-    .map(p => p.trim())
-    .filter(p => p.length > 10);
-
-  const paragraphs = rawParagraphs.length > 1
-    ? rawParagraphs
-    : targetText.split('\n').map(p => p.trim()).filter(p => p.length > 10);
-
-  if (paragraphs.length <= 1 && targetText.length <= 220) {
-    return targetText.trim();
+  // 4. If a specific subtitle heading matched the user's query (e.g. "## Código de Vestimenta")
+  // and its body is concise (so the query keywords were in the heading rather than repeated in the body)
+  if (matchedByHeadingOnly && targetHeading && targetText.length <= 350) {
+    return `**${targetHeading}:** ${targetText.trim()}`;
   }
 
-  const scoredParagraphs: { text: string; score: number }[] = [];
-
-  for (const para of paragraphs) {
-    const norm = normalizeText(para);
-    let score = 0;
-    for (const kw of keywords) {
-      if (norm.includes(kw)) score += 10;
-    }
-    if (/\b(\d+|dias|horas|meses|semanas|plazo|requisito|monto|\$|porcentaje|art|portal|formulario)\b/i.test(norm)) {
-      score += 3;
-    }
-    if (score > 0) {
-      scoredParagraphs.push({ text: para, score });
-    }
-  }
-
-  if (scoredParagraphs.length > 0) {
-    scoredParagraphs.sort((a, b) => b.score - a.score);
-    const top = scoredParagraphs[0];
-    if (targetHeading && !top.text.toLowerCase().includes(targetHeading.toLowerCase())) {
-      return `**${targetHeading}:**\n${top.text}`;
-    }
-    return top.text;
-  }
-
-  // 5. Fallback: first sentence or first concise snippet
+  // 5. Fallback: first concise sentence (never dump the entire manual)
   const first = sentences[0] || targetText.slice(0, 180);
-  return first.length > 200 ? first.slice(0, 200).trim() + '...' : first;
+  return first.length > 220 ? first.slice(0, 220).trim() + '...' : first;
 }
 
 /**
@@ -765,7 +1009,11 @@ export function generateLocalGroundedAnswer(
     const whoMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+|^)([a-záéíóú\s]+?)(?:\?|$)/i);
     const targetEntityType = detectTargetEntityType(query);
     const rosterLines = relevantExcerpt.split('\n').map(l => l.trim()).filter(Boolean);
-    const isRoster = rosterLines.length > 0 && rosterLines.every(l => l.includes('-') || l.includes('–'));
+    const hasSectionRoster = parseRosterEntries(primary.section.content).length >= 2;
+    const isRoster =
+      hasSectionRoster &&
+      rosterLines.length > 0 &&
+      rosterLines.every(l => /^[^•\d-][^-–—]{1,35}\s+[-–—]\s+.+$/.test(l));
 
     if (isRoster) {
       const siteMatch = query.match(/\b(foresta|sunset|[A-ZÁÉÍÓÚ][a-zñáéíóú]{3,})\b/i);
@@ -801,7 +1049,12 @@ export function generateLocalGroundedAnswer(
       }
     } else {
       // Direct and concise response (never dumps the whole manual)
-      answer = `Según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]): **${relevantExcerpt}**`;
+      const formattedExcerpt = relevantExcerpt.includes('\n')
+        ? `\n${relevantExcerpt}`
+        : relevantExcerpt.includes('**')
+          ? relevantExcerpt
+          : `**${relevantExcerpt}**`;
+      answer = `Según el **${primary.manual.title}** ([${primary.manual.code}: ${primary.section.articleNumber}]): ${formattedExcerpt}`;
     }
   }
 

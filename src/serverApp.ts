@@ -54,14 +54,20 @@ function enforceLaserSpecificAnswer(
     }
   }
 
-  // 2. If the LLM generates a full manual dump, or repeats the preamble / entire article:
+  // 2. If the LLM generates a full manual dump, repeats the preamble, or outputs much more than the specific excerpt:
+  const excerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
   if (
     /establece puntualmente lo siguiente/i.test(generatedText) ||
     /en primer lugar, se debe controlar/i.test(generatedText) ||
-    (generatedText.length > 320 && (entityType === 'person' || entityType === 'schedule' || entityType === 'amount'))
+    (generatedText.length > 320 && (entityType === 'person' || entityType === 'schedule' || entityType === 'amount')) ||
+    (excerpt && generatedText.length > Math.max(340, excerpt.length * 2.2))
   ) {
-    const excerpt = extractRelevantExcerpt(primary.section.content, query, primary.section.keyPoints);
-    return `Según el **${primary.manual.title}** (${citation}): **${excerpt}**`;
+    const formattedExcerpt = excerpt.includes('\n')
+      ? `\n${excerpt}`
+      : excerpt.includes('**')
+        ? excerpt
+        : `**${excerpt}**`;
+    return `Según el **${primary.manual.title}** (${citation}): ${formattedExcerpt}`;
   }
 
   // 3. Multi-site query enforcement:

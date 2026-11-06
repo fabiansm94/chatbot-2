@@ -356,3 +356,54 @@ test('multi-site query returns ONLY the requested site and never other sites', (
   assert.ok(!answerHeidi.answer.includes('Farida'));
 });
 
+test('extractRelevantExcerpt extracts ONLY the specific item from a single-section manual with 1,2,3 and a,b,c lists', () => {
+  const richManualContent = `
+# Normas Operativas Condominio Las Palmas
+1. El acceso de proveedores está permitido únicamente de lunes a viernes de 08:00 a 16:00 hrs.
+2. Las rondas perimetrales por cámaras deben realizarse cada 20 minutos sin excepción.
+3. En caso de corte de energía eléctrica, verificar que el generador encienda en menos de 3 minutos.
+4. El encargado de mantenimiento del edificio es Roberto Gómez (teléfono 8888-5555).
+
+## Protocolo de Piscina
+a. El horario de uso de la piscina es de 07:00 a 21:00 hrs de martes a domingo.
+b. Los días lunes la piscina permanece cerrada por mantenimiento y aplicación de químicos.
+c. Está estrictamente prohibido ingresar con envases de vidrio al área de piscina.
+  `.trim();
+
+  // Ask about item 2 (rondas)
+  const exRondas = extractRelevantExcerpt(richManualContent, '¿Cada cuánto se hacen las rondas perimetrales en Las Palmas?');
+  assert.ok(exRondas.includes('20 minutos'));
+  assert.ok(!exRondas.includes('proveedores'));
+  assert.ok(!exRondas.includes('Roberto Gómez'));
+  assert.ok(!exRondas.includes('envases de vidrio'));
+
+  // Ask about item 3 (corte de energía)
+  const exEnergia = extractRelevantExcerpt(richManualContent, '¿Qué se hace en caso de corte de energía eléctrica?');
+  assert.ok(exEnergia.includes('generador'));
+  assert.ok(!exEnergia.includes('20 minutos'));
+  assert.ok(!exEnergia.includes('proveedores'));
+
+  // Ask about item c (prohibido en piscina)
+  const exVidrio = extractRelevantExcerpt(richManualContent, '¿Qué está prohibido en la piscina?');
+  assert.ok(exVidrio.includes('envases de vidrio'));
+  assert.ok(!exVidrio.includes('07:00 a 21:00'));
+  assert.ok(!exVidrio.includes('Roberto Gómez'));
+});
+
+test('extractRelevantExcerpt does NOT dump the whole manual even when the manual is short (< 220 chars)', () => {
+  const shortManual = `El código de la alarma de bodega es 4829.
+Las llaves de la camioneta las custodia el supervisor Pedro Soto.
+El camión recolector de basura pasa los martes y jueves.`;
+
+  const exCodigo = extractRelevantExcerpt(shortManual, '¿Cuál es el código de la alarma de bodega?');
+  assert.ok(exCodigo.includes('4829'));
+  assert.ok(!exCodigo.includes('Pedro Soto'));
+  assert.ok(!exCodigo.includes('camión recolector'));
+
+  const exLlaves = extractRelevantExcerpt(shortManual, '¿Quién tiene las llaves de la camioneta?');
+  assert.ok(exLlaves.includes('Pedro Soto'));
+  assert.ok(!exLlaves.includes('4829'));
+  assert.ok(!exLlaves.includes('camión recolector'));
+});
+
+
