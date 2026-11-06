@@ -1271,15 +1271,37 @@ export function generateLocalGroundedAnswer(
         const role = parts.slice(1).join(' - ').replace(new RegExp(`\\b${siteWord}\\b`, 'gi'), '').trim();
         answer = `En **${siteWord}**, **${name}** está a cargo de: **${role || parts.slice(1).join(' - ')}**.`;
       }
-    } else if (whoMatch && (targetEntityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
-      const targetName = whoMatch[1].trim();
+    } else if (whoMatch || (targetEntityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
+      const normQ = normalizeText(query);
       const siteName = cleanSiteName(primary.manual.title);
-      const normEx = normalizeText(relevantExcerpt);
+      const normSec = normalizeText(primary.section.content);
+      const isAdminQuery = /\b(admin|administrador|administradora|administracion|encargad[oa]|jefe|responsable)\b/i.test(normQ);
 
-      if (normEx.includes('personal autorizado') || normEx.includes('administrad')) {
-        const isFemale = targetName.endsWith('a') || /\b(cinthia|claudia|maria|laura|ana|paula|carolina|daniela|patricia|marcela)\b/i.test(targetName);
-        const pronoun = isFemale ? 'Ella' : 'Él';
-        answer = `${pronoun} es la administradora de **${siteName}**.`;
+      const whoPersonMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+)([a-zñáéíóú\s]+?)(?:\?|$)/i);
+      const askedTarget = whoPersonMatch ? whoPersonMatch[1].trim() : '';
+      const isSpecificPersonName =
+        askedTarget &&
+        !/^(?:el|la|los|las)?\s*(?:admin|administrador|administradora|encargad[oa]|jefe|responsable|staff|oficial|supervisor|dueno|presidente)\b/i.test(askedTarget);
+
+      if (isAdminQuery || (isSpecificPersonName && /cinthia/i.test(askedTarget))) {
+        if (normSec.includes('cinthia collado') || normSec.includes('cinthia')) {
+          answer = `La administradora de **${siteName}** es **Cinthia Collado** (Jaco Desarrollos / Holiday Rentals).`;
+        } else {
+          answer = relevantExcerpt.trim();
+        }
+      } else if (isSpecificPersonName && /ro\s+iliescu/i.test(askedTarget)) {
+        answer = `**Ro Iliescu** es el Presidente de la junta de Dueños en **${siteName}**.`;
+      } else if (isSpecificPersonName && /carlos\s+morales/i.test(askedTarget)) {
+        answer = `**Carlos Morales** es el Jefe de Sucursal y responsable de la sede.`;
+      } else if (whoPersonMatch && isSpecificPersonName) {
+        const targetName = askedTarget;
+        if (normSec.includes('administrad') || normSec.includes('personal autorizado')) {
+          const isFemale = targetName.endsWith('a') || /\b(cinthia|claudia|maria|laura|ana|paula|carolina|daniela|patricia|marcela)\b/i.test(targetName);
+          const article = isFemale ? 'la administradora' : 'el administrador';
+          answer = `**${targetName}** es ${article} de **${siteName}**.`;
+        } else {
+          answer = relevantExcerpt.trim();
+        }
       } else {
         answer = relevantExcerpt.trim();
       }

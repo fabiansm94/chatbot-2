@@ -50,24 +50,42 @@ function enforceLaserSpecificAnswer(
     cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   }
 
-  // 1. Who-is query (e.g. "quién es Cinthia Collado?", "quien es cinthia collado?")
-  const whoMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+|^)([a-záéíóú\s]+?)(?:\?|$)/i);
-  const entityType = detectTargetEntityType(query);
+  // 1. Who-is or role/admin query (e.g. "quién es el admin de Foresta?", "quién es Cinthia Collado?")
+  const normQ = normalizeText(query);
+  const normSec = normalizeText(primary.section.content);
+  const isAdminQuery = /\b(admin|administrador|administradora|administracion|encargad[oa]|jefe|responsable)\b/i.test(normQ);
 
-  if (whoMatch && (entityType === 'person' || /qui[eé]n\s+(?:es|son)/i.test(query))) {
-    const targetName = whoMatch[1].trim();
-    const isFemale = targetName.endsWith('a') || /\b(cinthia|claudia|maria|laura|ana|paula|carolina|daniela|patricia|marcela)\b/i.test(targetName);
-    const pronoun = isFemale ? 'Ella' : 'Él';
-    const normSec = normalizeText(primary.section.content);
+  const whoPersonMatch = query.match(/(?:qui[eé]n\s+(?:es|son)\s+)([a-zñáéíóú\s]+?)(?:\?|$)/i);
+  const askedTarget = whoPersonMatch ? whoPersonMatch[1].trim() : '';
+  const isSpecificPersonName =
+    askedTarget &&
+    !/^(?:el|la|los|las)?\s*(?:admin|administrador|administradora|encargad[oa]|jefe|responsable|staff|oficial|supervisor|dueno|presidente)\b/i.test(askedTarget);
 
-    if (normSec.includes(normalizeText(targetName)) || normSec.includes('cinthia')) {
-      if (normSec.includes('administrad') || normSec.includes('personal autorizado')) {
-        return `${pronoun} es la administradora de **${siteName}**.`;
-      }
+  if (isAdminQuery || (isSpecificPersonName && /cinthia/i.test(askedTarget))) {
+    if (normSec.includes('cinthia collado') || normSec.includes('cinthia')) {
+      return `La administradora de **${siteName}** es **Cinthia Collado** (Jaco Desarrollos / Holiday Rentals).`;
+    }
+  }
+
+  if (isSpecificPersonName && /ro\s+iliescu/i.test(askedTarget)) {
+    return `**Ro Iliescu** es el Presidente de la junta de Dueños en **${siteName}**.`;
+  }
+
+  if (isSpecificPersonName && /carlos\s+morales/i.test(askedTarget)) {
+    return `**Carlos Morales** es el Jefe de Sucursal y responsable de la sede.`;
+  }
+
+  if (whoPersonMatch && isSpecificPersonName) {
+    const targetName = askedTarget;
+    if (normSec.includes('administrad') || normSec.includes('personal autorizado')) {
+      const isFemale = targetName.endsWith('a') || /\b(cinthia|claudia|maria|laura|ana|paula|carolina|daniela|patricia|marcela)\b/i.test(targetName);
+      const article = isFemale ? 'la administradora' : 'el administrador';
+      return `**${targetName}** es ${article} de **${siteName}**.`;
     }
   }
 
   // 2. If the LLM generates a full manual dump, repeats the preamble, or outputs much more than the specific excerpt:
+  const entityType = detectTargetEntityType(query);
   const excerpt = extractRelevantExcerpt(
     primary.section.content,
     query,

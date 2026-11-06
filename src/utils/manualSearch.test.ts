@@ -259,10 +259,17 @@ test('generateLocalGroundedAnswer responds directly with Ella es la administrado
   const results = searchManuals('quien es cinthia collado?', [mockManual]);
   const { answer } = generateLocalGroundedAnswer('quien es cinthia collado?', results, 'direct');
 
-  assert.strictEqual(answer, 'Ella es la administradora de **Foresta Residence**.');
+  assert.ok(answer.includes('Cinthia Collado'), `Expected Cinthia Collado in "${answer}"`);
+  assert.ok(answer.includes('Foresta Residence'), `Expected Foresta Residence in "${answer}"`);
   assert.ok(!answer.includes('entradas y salidas'));
   assert.ok(!answer.includes('diario de visitas'));
   assert.ok(!answer.includes('piscinas'));
+
+  // Also verify "quien es el admin de foresta?" yields Cinthia Collado
+  const adminResults = searchManuals('quien es el admin de foresta?', [mockManual]);
+  const adminAnswer = generateLocalGroundedAnswer('quien es el admin de foresta?', adminResults, 'direct');
+  assert.ok(adminAnswer.answer.includes('Cinthia Collado'), `Expected Cinthia Collado in "${adminAnswer.answer}"`);
+  assert.ok(adminAnswer.answer.includes('Foresta Residence'), `Expected Foresta Residence in "${adminAnswer.answer}"`);
 });
 
 test('searchManuals does not crash when manual sections lack tags property', () => {
