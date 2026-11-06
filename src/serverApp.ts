@@ -23,7 +23,7 @@ import {
 } from './utils/manualSearch.ts';
 import { DEFAULT_MANUALS } from './data/defaultManuals.ts';
 import { ManualDocument, SearchResult } from './types/manual.ts';
-import { cleanRawHtmlTags } from './utils/textFormatting.ts';
+import { cleanRawHtmlTags, textOrHtmlToEditorHtml } from './utils/textFormatting.ts';
 
 dotenv.config();
 
@@ -150,7 +150,7 @@ app.get('/widget.js', (req: Request, res: Response) => {
   iframe.style.zIndex = '999999';
   iframe.style.transition = 'all 0.25s ease';
   iframe.style.backgroundColor = '#fff8f8';
-  iframe.title = 'AI-zen - Asistente STS Security';
+  iframe.title = 'AI-zen - Asistente Control y Monitoreo';
   iframe.allow = 'clipboard-write';
 
   // Create toggle button
@@ -460,7 +460,7 @@ app.post('/api/search', (req: Request, res: Response) => {
   });
 });
 
-// Parse uploaded PDF and Word (DOCX/DOC) documents
+// Parse uploaded PDF and Word (DOCX/DOC) documents and transcribe full content with formatting
 app.post('/api/parse-document', async (req: Request, res: Response) => {
   try {
     const { fileName, fileBase64, mimeType } = req.body;
@@ -475,11 +475,16 @@ app.post('/api/parse-document', async (req: Request, res: Response) => {
     const isDocx = lowerName.endsWith('.docx') || lowerName.endsWith('.doc') || (mimeType && (mimeType.includes('word') || mimeType.includes('officedocument')));
 
     let extractedText = '';
+    let extractedHtml = '';
 
     if (isDocx) {
       const mammothAny = (mammoth as any).default || mammoth;
-      const result = await mammothAny.extractRawText({ buffer });
-      extractedText = result.value || '';
+      const [rawResult, htmlResult] = await Promise.all([
+        mammothAny.extractRawText({ buffer }),
+        mammothAny.convertToHtml ? mammothAny.convertToHtml({ buffer }) : Promise.resolve({ value: '' })
+      ]);
+      extractedText = rawResult?.value || '';
+      extractedHtml = htmlResult?.value || '';
     } else if (isPdf) {
       const PDFParseClass = (PDFParse as any);
       if (typeof PDFParseClass === 'function' && PDFParseClass.prototype?.load) {
@@ -495,211 +500,100 @@ app.post('/api/parse-document', async (req: Request, res: Response) => {
       extractedText = buffer.toString('utf-8');
     }
 
-    if (!extractedText.trim()) {
+    if (!extractedText.trim() && !extractedHtml.trim()) {
       res.status(422).json({
         error: 'No se pudo extraer texto legible del archivo. Verifica que el archivo no esté protegido con contraseña o dañado.'
       });
       return;
     }
 
-    let manualData: {
-      title: string;
-      category: 'rrhh' | 'seguridad' | 'ti' | 'legal_etica' | 'operaciones' | 'general';
-      department: string;
-      version: string;
-      summary: string;
-      sections: Array<{
-        articleNumber: string;
-        title: string;
-        content: string;
-        tags: string[];
-      }>;
-    } | null = null;
+    const cleanTitle = fileName
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[_-]/g, ' ')
+      .replace(/\b\w/g, (l: string) => l.toUpperCase())
+      .trim() || 'Manual Corporativo';
 
-    const aiClient = getAiClient();
+    // Convert full transcribed document into clean Rich Text HTML (headings, paragraphs, lists 1,2,3 / a,b,c / bullets)
+    let transcribedHtml = extractedHtml.trim()
+      ? extractedHtml.trim()
+      : textOrHtmlToEditorHtml(extractedText);
+
+    let detectedTitle = cleanTitle;
     let parsedWithAi = false;
 
-    if (aiClient) {
+    const aiClient = getAiClient();
+    if (aiClient && !extractedHtml.trim() && extractedText.length > 0 && extractedText.length < 25000) {
       try {
-        const prompt = `Analiza el siguiente texto extraído de un documento oficial de la empresa (PDF o Word) con nombre de archivo "${fileName}".
-Devuelve ÚNICAMENTE un objeto JSON válido con la siguiente estructura exacta:
+        const prompt = `Transcribe íntegramente el siguiente documento ("${fileName}") a formato HTML limpio para un editor de texto enriquecido, SIN resumir ni omitir información.
+Usa únicamente las etiquetas: <h1>, <h2>, <p>, <strong>, <em>, <ul><li><p>...</p></li></ul>, <ol data-list-type="decimal"><li><p>...</p></li></ol>, y <ol data-list-type="lower-alpha" type="a" style="list-style-type: lower-alpha"><li><p>...</p></li></ol> (cuando haya listas con letras a, b, c).
+Devuelve un JSON con esta estructura exacta:
 {
-  "title": "Título conciso y oficial del manual o procedimiento",
-  "category": "rrhh" | "ti" | "seguridad" | "legal_etica" | "operaciones" | "general",
-  "department": "Departamento responsable",
-  "version": "1.0",
-  "summary": "Resumen claro de 2 a 3 oraciones de la política o procedimiento",
-  "sections": [
-    {
-      "articleNumber": "Art. 1" (o número de artículo/sección correlativo),
-      "title": "Título breve y descriptivo de la cláusula o procedimiento",
-      "content": "Texto detallado con sus reglas o indicaciones",
-      "tags": ["etiqueta1", "etiqueta2"]
-    }
-  ]
+  "title": "Título oficial del manual",
+  "contentHtml": "Transcripción completa en HTML conservando listas, títulos y párrafos"
 }
 
-Si el documento no tiene divisiones explícitas de artículos, organízalo en secciones lógicas y claras (mínimo 2 y máximo 8 secciones).
 TEXTO DEL DOCUMENTO:
-${extractedText.slice(0, 35000)}
+${extractedText}
 `;
-
         const response: any = await Promise.race([
           aiClient.models.generateContent({
-            model: 'gemini-3.8-flash',
+            model: 'gemini-3-flash-preview',
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
-              temperature: 0.2,
+              temperature: 0.1,
               responseMimeType: 'application/json'
             }
           }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('AI parsing timeout')), 14000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('AI transcription timeout')), 12000))
         ]);
 
         const rawJson = response.text?.trim() || '';
         const cleanedJson = rawJson.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim();
         const jsonResult = JSON.parse(cleanedJson);
-
-        if (jsonResult && jsonResult.title && Array.isArray(jsonResult.sections) && jsonResult.sections.length > 0) {
-          manualData = jsonResult;
+        if (jsonResult && jsonResult.contentHtml) {
+          transcribedHtml = jsonResult.contentHtml;
+          if (jsonResult.title) detectedTitle = cleanRawHtmlTags(jsonResult.title);
           parsedWithAi = true;
         }
       } catch (aiErr) {
-        console.warn('[ManualBot Server] AI document parsing failed or timed out, using heuristic fallback:', aiErr);
+        console.warn('[ManualBot Server] AI transcription fallback to direct structured transcription:', aiErr);
       }
     }
 
-    if (!manualData) {
-      const cleanTitle = fileName
-        .replace(/\.[^/.]+$/, '')
-        .replace(/[_-]/g, ' ')
-        .replace(/\b\w/g, (l: string) => l.toUpperCase())
-        .trim();
-
-      const lowerText = extractedText.toLowerCase();
-      let category: 'rrhh' | 'seguridad' | 'ti' | 'legal_etica' | 'operaciones' | 'general' = 'general';
-      let department = 'Dirección General';
-
-      if (lowerText.includes('vacaci') || lowerText.includes('remuneraci') || lowerText.includes('licencia') || lowerText.includes('empleado') || lowerText.includes('beneficio') || lowerText.includes('rrhh')) {
-        category = 'rrhh';
-        department = 'Recursos Humanos & Gestión de Talento';
-      } else if (lowerText.includes('ciberseguridad') || lowerText.includes('contraseña') || lowerText.includes('vpn') || lowerText.includes('software') || lowerText.includes('antivirus') || lowerText.includes('red')) {
-        category = 'ti';
-        department = 'Tecnología e Información (TI)';
-      } else if (lowerText.includes('accidente') || lowerText.includes('evacuaci') || lowerText.includes('epp') || lowerText.includes('extintor') || lowerText.includes('sst') || lowerText.includes('seguridad')) {
-        category = 'seguridad';
-        department = 'Prevención de Riesgos y Seguridad';
-      } else if (lowerText.includes('etica') || lowerText.includes('conducta') || lowerText.includes('confidencial') || lowerText.includes('denuncia') || lowerText.includes('anticorrupci')) {
-        category = 'legal_etica';
-        department = 'Legal y Cumplimiento Normativo';
-      } else if (lowerText.includes('viatico') || lowerText.includes('reembolso') || lowerText.includes('gasto') || lowerText.includes('proveedor') || lowerText.includes('compra')) {
-        category = 'operaciones';
-        department = 'Administración y Finanzas';
-      }
-
-      const articleRegex = /(?:^|\n)(?:Artículo|Art\.|Capítulo|Cap\.|Sección|Sec\.|Cláusula)\s*([0-9A-Za-z\.\-]+)[\.:\- ]*(.*?)(?=\n(?:Artículo|Art\.|Capítulo|Cap\.|Sección|Sec\.|Cláusula)\s*[0-9A-Za-z\.\-]+|\n\n\n|$)/gis;
-      const sections: Array<{ articleNumber: string; title: string; content: string; tags: string[] }> = [];
-
-      let match;
-      let count = 0;
-      while ((match = articleRegex.exec(extractedText)) !== null && count < 20) {
-        count++;
-        const artNum = `Art. ${match[1].trim()}`;
-        const header = match[2]?.trim() || `Artículo ${match[1]}`;
-        const headerLines = header.split('\n');
-        const artTitle = (headerLines[0] || `Disposición ${count}`).slice(0, 80).trim();
-        const content = (headerLines.slice(1).join('\n') || match[0]).trim();
-        if (content.length > 10) {
-          sections.push({
-            articleNumber: artNum,
-            title: artTitle || `Norma ${count}`,
-            content: content.slice(0, 3000),
-            tags: [category, 'documento']
-          });
-        }
-      }
-
-      if (sections.length === 0) {
-        const paragraphs = extractedText
-          .split(/\n\s*\n/)
-          .map(p => p.trim())
-          .filter(p => p.length > 40);
-
-        if (paragraphs.length > 0) {
-          const chunkSize = Math.max(1, Math.ceil(paragraphs.length / 5));
-          for (let i = 0; i < paragraphs.length && sections.length < 6; i += chunkSize) {
-            const chunk = paragraphs.slice(i, i + chunkSize).join('\n\n');
-            const lines = chunk.split('\n');
-            const firstLine = lines[0].replace(/^[#\*\-0-9\.\s]+/, '').trim().slice(0, 70);
-            sections.push({
-              articleNumber: `Art. ${sections.length + 1}`,
-              title: firstLine || `Sección ${sections.length + 1}`,
-              content: chunk.slice(0, 3000),
-              tags: [category, 'oficial']
-            });
-          }
-        } else {
-          sections.push({
-            articleNumber: 'Art. 1',
-            title: 'Contenido General del Documento',
-            content: extractedText.slice(0, 3000),
-            tags: [category]
-          });
-        }
-      }
-
-      const cleanSummary = extractedText
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 280) + '...';
-
-      manualData = {
-        title: cleanTitle || 'Manual Corporativo',
-        category,
-        department,
-        version: '1.0',
-        summary: cleanSummary,
-        sections
-      };
-    }
-
-    const codePrefix = {
-      rrhh: 'RRHH',
-      ti: 'TI',
-      seguridad: 'SST',
-      legal_etica: 'ETICA',
-      operaciones: 'OPER',
-      general: 'GEN'
-    }[manualData.category] || 'MAN';
-
+    const plainFullText = cleanRawHtmlTags(transcribedHtml || extractedText);
     const timestamp = Date.now();
+
     const finalManual: ManualDocument = {
       id: `man-upload-${timestamp}`,
-      title: cleanRawHtmlTags(manualData.title),
-      code: `MAN-${codePrefix}-${timestamp.toString().slice(-4)}`,
-      category: manualData.category,
-      department: manualData.department,
-      version: manualData.version || '1.0',
+      title: detectedTitle,
+      code: `MAN-${timestamp.toString().slice(-4)}`,
+      category: 'general',
+      department: 'General',
+      version: '1.0',
       updatedDate: new Date().toISOString().split('T')[0],
-      summary: cleanRawHtmlTags(manualData.summary),
-      description: cleanRawHtmlTags(manualData.summary),
+      summary: transcribedHtml,
+      description: plainFullText,
       iconName: 'FileText',
-      sections: manualData.sections.map((sec, idx) => ({
-        id: `sec-${timestamp}-${idx + 1}`,
-        articleNumber: sec.articleNumber || `Art. ${idx + 1}`,
-        title: cleanRawHtmlTags(sec.title || `Sección ${idx + 1}`),
-        content: cleanRawHtmlTags(sec.content || 'Sin detalles adicionales.'),
-        tags: Array.isArray(sec.tags) && sec.tags.length > 0 ? sec.tags : [manualData!.category]
-      }))
+      sections: [
+        {
+          id: `sec-${timestamp}-1`,
+          articleNumber: 'Contenido Oficial',
+          title: detectedTitle,
+          content: plainFullText,
+          tags: ['manual', 'oficial']
+        }
+      ]
     };
 
     res.json({
       success: true,
       parsedWithAi,
+      contentHtml: transcribedHtml,
+      fullText: plainFullText,
       manual: finalManual,
       stats: {
-        characters: extractedText.length,
-        sectionsCount: finalManual.sections.length,
+        characters: plainFullText.length,
+        sectionsCount: 1,
         fileName
       }
     });

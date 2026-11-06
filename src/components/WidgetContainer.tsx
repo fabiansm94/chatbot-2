@@ -52,16 +52,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     return localStorage.getItem(STORAGE_KEY_COMPANY) || initialCompanyName || 'STS Security';
   });
 
-  const [threads, setThreads] = useState<UserChatThread[]>(() => {
-    try {
-      const saved = localStorage.getItem('manualbot_widget_threads_v3');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return DEFAULT_USER_THREADS;
-  });
+  const [threads, setThreads] = useState<UserChatThread[]>(DEFAULT_USER_THREADS);
 
   const [activeThreadId, setActiveThreadId] = useState<string>('current-user');
   const [isLoading, setIsLoading] = useState(false);

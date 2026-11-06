@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   decodeHtmlEntities,
   cleanRawHtmlTags,
-  stripHtmlForPreview
+  stripHtmlForPreview,
+  textOrHtmlToEditorHtml
 } from './textFormatting';
 
 test('decodeHtmlEntities decodes common HTML entities and accented characters', () => {
@@ -43,6 +44,33 @@ test('cleanRawHtmlTags handles paragraph and formatting tags', () => {
   assert.ok(cleaned.includes('`código`'));
   assert.ok(!cleaned.includes('<p>'));
   assert.ok(!cleaned.includes('</p>'));
+});
+
+test('cleanRawHtmlTags and textOrHtmlToEditorHtml preserve 1,2,3, a,b,c, and bullet lists', () => {
+  const rawTranscript = [
+    '# Procedimiento General',
+    '1. Primer paso obligatorio',
+    '2. Segundo paso de validación',
+    '',
+    'a. Opción A del proceso',
+    'b. Opción B del proceso',
+    '',
+    '• Punto importante uno',
+    '• Punto importante dos'
+  ].join('\n');
+
+  const editorHtml = textOrHtmlToEditorHtml(rawTranscript);
+  assert.ok(editorHtml.includes('<ol data-list-type="decimal">'));
+  assert.ok(editorHtml.includes('<ol data-list-type="lower-alpha" type="a">'));
+  assert.ok(editorHtml.includes('<ul>'));
+
+  const roundTripText = cleanRawHtmlTags(editorHtml);
+  assert.ok(roundTripText.includes('1. Primer paso obligatorio'));
+  assert.ok(roundTripText.includes('2. Segundo paso de validación'));
+  assert.ok(roundTripText.includes('a. Opción A del proceso'));
+  assert.ok(roundTripText.includes('b. Opción B del proceso'));
+  assert.ok(roundTripText.includes('• Punto importante uno'));
+  assert.ok(roundTripText.includes('• Punto importante dos'));
 });
 
 test('stripHtmlForPreview generates clean plain text preview for cards', () => {

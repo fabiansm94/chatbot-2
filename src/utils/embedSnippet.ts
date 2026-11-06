@@ -20,7 +20,7 @@ export function generateIframeSnippet(baseUrl: string, options: Partial<WidgetEm
   width="100%"
   height="640"
   style="width: 100%; max-width: 420px; height: 640px; border: 1px solid #fecdd3; border-radius: 28px; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25); display: block; margin: 0 auto;"
-  title="AI-zen - Asistente STS Security"
+  title="AI-zen - Asistente Control y Monitoreo"
   allow="clipboard-write"
 ></iframe>`;
 }

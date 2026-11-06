@@ -95,10 +95,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Search className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Artículos</span>
+              <span className="hidden sm:inline">Manuales</span>
               <span className="sm:hidden">Buscar</span>
               <span className="text-[10px] px-1 rounded-full bg-slate-800 text-slate-300">
-                {totalArticles}
+                {totalManuals}
               </span>
             </button>
 

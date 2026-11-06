@@ -2,27 +2,24 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Plus,
-  Trash2,
-  Sparkles,
   BookOpen,
   Check,
   Upload,
   FileUp,
-  FileText,
   AlertCircle,
   Loader2,
-  FileType,
-  FileCheck2,
-  ChevronDown,
-  ChevronUp
+  FileCheck2
 } from 'lucide-react';
-import { ManualCategory, ManualDocument, ManualSection } from '../types/manual';
+import { ManualDocument } from '../types/manual';
 import { RichTextEditor } from './RichTextEditor';
+import { cleanRawHtmlTags, textOrHtmlToEditorHtml } from '../utils/textFormatting';
 
 interface AddManualModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddManual: (manual: ManualDocument) => void;
+  onUpdateManual?: (manual: ManualDocument) => void;
+  editingManual?: ManualDocument | null;
   initialFile?: File | null;
   defaultTab?: 'upload' | 'manual';
 }
@@ -31,46 +28,68 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
   isOpen,
   onClose,
   onAddManual,
+  onUpdateManual,
+  editingManual = null,
   initialFile = null,
   defaultTab = 'upload'
 }) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'manual'>(defaultTab);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<ManualCategory>('general');
-  const [department, setDepartment] = useState('Dirección General');
-  const [version, setVersion] = useState('1.0');
-  const [summary, setSummary] = useState('');
-  const [sections, setSections] = useState<ManualSection[]>([]);
+  const [contentHtml, setContentHtml] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [fileSizeStr, setFileSizeStr] = useState<string | null>(null);
-  const [parsedWithAi, setParsedWithAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expandedSectionIndex, setExpandedSectionIndex] = useState<number | null>(0);
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Sync tab or load editingManual when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (editingManual) {
+      setActiveTab('manual');
+      setTitle(editingManual.title || '');
+      // Combine existing content from summary or sections into clean rich HTML for editing
+      const rawExisting =
+        (editingManual.summary && editingManual.summary.length >= (editingManual.sections?.[0]?.content?.length || 0))
+          ? editingManual.summary
+          : editingManual.sections && editingManual.sections.length > 0
+            ? editingManual.sections
+                .map(s => (editingManual.sections.length > 1 && s.title ? `## ${s.title}\n${s.content}` : s.content))
+                .join('\n\n')
+            : editingManual.description || '';
+      setContentHtml(textOrHtmlToEditorHtml(rawExisting));
+      setError(null);
+    } else {
+      setActiveTab(defaultTab);
+      if (!initialFile) {
+        setTitle('');
+        setContentHtml('');
+        setUploadedFileName(null);
+        setFileSizeStr(null);
+        setError(null);
+      }
+    }
+  }, [isOpen, editingManual, defaultTab, initialFile]);
+
   // If opened with initialFile, process it automatically
   useEffect(() => {
-    if (initialFile && isOpen) {
+    if (initialFile && isOpen && !editingManual) {
+      setActiveTab('upload');
       handleFileSelected(initialFile);
     }
-  }, [initialFile, isOpen]);
+  }, [initialFile, isOpen, editingManual]);
 
   if (!isOpen) return null;
 
   const resetForm = () => {
     setTitle('');
-    setCategory('general');
-    setDepartment('Dirección General');
-    setVersion('1.0');
-    setSummary('');
-    setSections([]);
+    setContentHtml('');
     setUploadedFileName(null);
     setFileSizeStr(null);
-    setParsedWithAi(false);
     setError(null);
     setIsUploading(false);
   };
@@ -97,7 +116,7 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
     setFileSizeStr(formatFileSize(file.size));
     setError(null);
     setIsUploading(true);
-    setUploadProgress('Leyendo archivo...');
+    setUploadProgress('Leyendo y transcribiendo el documento...');
 
     try {
       const reader = new FileReader();
@@ -106,7 +125,7 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
           const resultStr = reader.result as string;
           const base64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr;
 
-          setUploadProgress('Analizando texto y estructurando artículos...');
+          setUploadProgress('Transcribiendo texto y aplicando formato enriquecido...');
 
           const response = await fetch('/api/parse-document', {
             method: 'POST',
@@ -124,17 +143,20 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
           }
 
           const parsed = data.manual as ManualDocument;
-          setTitle(parsed.title);
-          setCategory(parsed.category || 'general');
-          setDepartment(parsed.department || 'Dirección General');
-          setVersion(parsed.version || '1.0');
-          setSummary(parsed.summary || '');
-          setSections(parsed.sections || []);
-          setParsedWithAi(!!data.parsedWithAi);
+          setTitle(parsed.title || file.name.replace(/\.[^/.]+$/, ''));
+
+          const transcribed =
+            data.contentHtml ||
+            textOrHtmlToEditorHtml(
+              data.fullText ||
+                (parsed.sections ? parsed.sections.map(s => s.content).join('\n\n') : parsed.summary || '')
+            );
+
+          setContentHtml(transcribed);
           setIsUploading(false);
         } catch (serverErr: any) {
           setIsUploading(false);
-          setError(serverErr.message || 'No se pudo procesar el archivo en el servidor.');
+          setError(serverErr.message || 'No se pudo transcribir el archivo en el servidor.');
         }
       };
 
@@ -168,86 +190,74 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
     }
   };
 
-  const handleAddManualSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim()) {
-      setError('Por favor indica el título del documento.');
+      setError('Por favor indica el título del manual.');
       return;
     }
 
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = summary;
-    const plainSummary = (tempDiv.textContent || tempDiv.innerText || '').trim();
-
-    // Prepare sections
-    let finalSections: ManualSection[] = sections;
-    if (finalSections.length === 0) {
-      finalSections = [{
-        id: `sec-${Date.now()}-1`,
-        articleNumber: 'Art. 1',
-        title: title.trim(),
-        content: plainSummary || summary.trim() || 'Contenido del manual.',
-        tags: [category]
-      }];
+    const plainTextContent = cleanRawHtmlTags(contentHtml);
+    if (!plainTextContent.trim()) {
+      setError('Por favor ingresa la información o descripción del manual.');
+      return;
     }
 
-    const codePrefix = {
-      rrhh: 'RRHH',
-      ti: 'TI',
-      seguridad: 'SST',
-      legal_etica: 'ETICA',
-      operaciones: 'OPER',
-      general: 'GEN'
-    }[category] || 'MAN';
+    const nowDate = new Date().toISOString().split('T')[0];
 
+    if (editingManual && onUpdateManual) {
+      const updatedManual: ManualDocument = {
+        ...editingManual,
+        title: title.trim(),
+        updatedDate: nowDate,
+        summary: contentHtml,
+        description: plainTextContent,
+        sections: [
+          {
+            id: editingManual.sections?.[0]?.id || `sec-${Date.now()}-1`,
+            articleNumber: 'Manual Oficial',
+            title: title.trim(),
+            content: plainTextContent,
+            tags: ['manual', 'oficial']
+          }
+        ]
+      };
+      onUpdateManual(updatedManual);
+      handleClose();
+      return;
+    }
+
+    const timestamp = Date.now();
     const newManual: ManualDocument = {
-      id: `man-custom-${Date.now()}`,
+      id: `man-custom-${timestamp}`,
       title: title.trim(),
-      code: `MAN-${codePrefix}-${Date.now().toString().slice(-4)}`,
-      category,
-      department: department.trim() || 'Dirección General',
-      version: version.trim() || '1.0',
-      updatedDate: new Date().toISOString().split('T')[0],
-      summary: plainSummary || `Manual oficial: ${title}`,
-      description: plainSummary || `Manual oficial: ${title}`,
+      code: `MAN-${timestamp.toString().slice(-4)}`,
+      category: 'general',
+      department: 'General',
+      version: '1.0',
+      updatedDate: nowDate,
+      summary: contentHtml,
+      description: plainTextContent,
       iconName: 'FileText',
-      sections: finalSections
+      sections: [
+        {
+          id: `sec-${timestamp}-1`,
+          articleNumber: 'Manual Oficial',
+          title: title.trim(),
+          content: plainTextContent,
+          tags: ['manual', 'oficial']
+        }
+      ]
     };
 
     onAddManual(newManual);
     handleClose();
   };
 
-  const handleSectionChange = (index: number, field: keyof ManualSection, value: any) => {
-    setSections(prev => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
-    });
-  };
-
-  const handleAddSection = () => {
-    setSections(prev => [
-      ...prev,
-      {
-        id: `sec-${Date.now()}-${prev.length + 1}`,
-        articleNumber: `Art. ${prev.length + 1}`,
-        title: 'Nueva Cláusula o Sección',
-        content: '',
-        tags: [category]
-      }
-    ]);
-    setExpandedSectionIndex(sections.length);
-  };
-
-  const handleDeleteSection = (index: number) => {
-    setSections(prev => prev.filter((_, idx) => idx !== index));
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-[#2f3140] border border-[#3e4153] rounded-2xl shadow-2xl overflow-hidden my-6 text-white flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-3xl bg-[#2f3140] border border-[#3e4153] rounded-2xl shadow-2xl overflow-hidden my-6 text-white flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="p-5 border-b border-[#3e4153] bg-[#262835] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -255,13 +265,18 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Incorporar Manual o Procedimiento</h2>
+              <h2 className="text-base font-bold text-white">
+                {editingManual ? 'Editar Manual o Procedimiento' : 'Incorporar Manual o Procedimiento'}
+              </h2>
               <p className="text-xs text-slate-300">
-                Sube un archivo PDF o Word para integrarlo de inmediato a la base del Asistente
+                {editingManual
+                  ? 'Edita el contenido enriquecido en tiempo real y guarda los cambios sin necesidad de volver a subir el archivo'
+                  : 'Sube un archivo para transcribirlo automáticamente o redáctalo con formato en tiempo real'}
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={handleClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#3e4153] transition-colors"
           >
@@ -269,12 +284,12 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Selection */}
+        {/* Tab Selection (shown when creating a new manual, or allows re-importing a file) */}
         <div className="px-6 pt-3 pb-0 bg-[#262835] border-b border-[#3e4153] flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('upload')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 cursor-pointer ${
               activeTab === 'upload'
                 ? 'border-[#ca4048] text-white bg-[#2f3140]'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -286,19 +301,19 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('manual')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 cursor-pointer ${
               activeTab === 'manual'
                 ? 'border-[#ca4048] text-white bg-[#2f3140]'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Plus className="w-4 h-4" />
-            <span>Crear Manualmente</span>
+            <span>{editingManual ? 'Editar Contenido' : 'Crear Manualmente'}</span>
           </button>
         </div>
 
         {/* Body Form */}
-        <form onSubmit={handleAddManualSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
           {error && (
             <div className="p-3.5 rounded-xl bg-[#ca4048]/20 border border-[#ca4048]/50 text-xs text-white flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-[#ca4048] shrink-0 mt-0.5" />
@@ -308,7 +323,6 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
 
           {activeTab === 'upload' && (
             <div className="space-y-4">
-              {/* Dropzone */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -327,20 +341,20 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
                     isDragging
                       ? 'border-[#ca4048] bg-[#ca4048]/10 scale-[1.01]'
                       : 'border-[#3e4153] hover:border-[#ca4048]/60 bg-[#262835]/50 hover:bg-[#262835]'
                   }`}
                 >
-                  <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[#ca4048]/15 border border-[#ca4048]/30 flex items-center justify-center text-[#ca4048]">
-                    <Upload className="w-7 h-7" />
+                  <div className="w-12 h-12 mx-auto mb-2.5 rounded-2xl bg-[#ca4048]/15 border border-[#ca4048]/30 flex items-center justify-center text-[#ca4048]">
+                    <Upload className="w-6 h-6" />
                   </div>
                   <h3 className="text-sm font-bold text-white mb-1">
-                    Arrastra tu archivo aquí o haz clic para explorar
+                    Arrastra tu archivo PDF o Word aquí o haz clic para seleccionarlo
                   </h3>
                   <p className="text-xs text-slate-300 max-w-md mx-auto mb-3 leading-relaxed">
-                    Soporta documentos oficiales en formato PDF (.pdf) y Microsoft Word (.docx, .doc). El sistema extraerá el título, departamento y los artículos automáticamente.
+                    El sistema leerá el archivo y lo transcribirá en el editor de abajo con su formato y listas para que puedas editarlo directamente cuando quieras.
                   </p>
                   <div className="flex items-center justify-center gap-2">
                     <span className="px-2.5 py-1 rounded-lg bg-[#ca4048]/20 text-[#ca4048] font-mono text-[11px] font-semibold border border-[#ca4048]/30">
@@ -353,27 +367,22 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
                 </div>
               )}
 
-              {/* Uploading State */}
               {isUploading && (
-                <div className="rounded-2xl bg-[#262835] border border-[#3e4153] p-8 text-center space-y-3">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-[#ca4048]/20 flex items-center justify-center text-[#ca4048]">
-                    <Loader2 className="w-6 h-6 animate-spin" />
+                <div className="rounded-2xl bg-[#262835] border border-[#3e4153] p-6 text-center space-y-3">
+                  <div className="w-11 h-11 mx-auto rounded-full bg-[#ca4048]/20 flex items-center justify-center text-[#ca4048]">
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-white">Procesando {uploadedFileName}</h4>
+                    <h4 className="text-sm font-bold text-white">Transcribiendo {uploadedFileName}</h4>
                     <p className="text-xs text-slate-300 mt-1">{uploadProgress}</p>
-                  </div>
-                  <div className="w-48 h-1.5 bg-[#2f3140] rounded-full mx-auto overflow-hidden">
-                    <div className="h-full bg-[#ca4048] rounded-full animate-pulse w-3/4"></div>
                   </div>
                 </div>
               )}
 
-              {/* Uploaded File Pill */}
               {uploadedFileName && !isUploading && (
-                <div className="p-4 rounded-xl bg-[#262835] border border-[#3e4153] flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-xl bg-[#262835] border border-[#3e4153] flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2.5 rounded-lg bg-[#ca4048]/20 text-[#ca4048] border border-[#ca4048]/30 shrink-0">
+                    <div className="p-2 rounded-lg bg-[#ca4048]/20 text-[#ca4048] border border-[#ca4048]/30 shrink-0">
                       <FileCheck2 className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
@@ -385,23 +394,16 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
                           <span className="text-[11px] text-slate-400 font-mono">({fileSizeStr})</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-                          ✓ Contenido extraído con éxito
-                        </span>
-                        {parsedWithAi && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
-                            IA Estructurada
-                          </span>
-                        )}
-                      </div>
+                      <span className="text-[11px] text-emerald-400 font-medium block mt-0.5">
+                        ✓ Archivo transcrito al editor — puedes editar el texto libremente abajo
+                      </span>
                     </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-lg bg-[#2f3140] hover:bg-[#3e4153] text-xs font-medium text-slate-200 border border-[#3e4153] transition-colors shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-[#2f3140] hover:bg-[#3e4153] text-xs font-medium text-slate-200 border border-[#3e4153] transition-colors shrink-0 cursor-pointer"
                   >
                     Cambiar archivo
                   </button>
@@ -410,221 +412,55 @@ export const AddManualModal: React.FC<AddManualModalProps> = ({
             </div>
           )}
 
-          {/* Metadata Fields (editable in both upload and manual mode) */}
-          <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-200 mb-1">
-                  Título del Manual / Documento *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Procedimiento de Ciberseguridad y Accesos"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[#262835] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-200 mb-1">
-                  Versión
-                </label>
-                <input
-                  type="text"
-                  placeholder="1.0"
-                  value={version}
-                  onChange={e => setVersion(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[#262835] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-200 mb-1">
-                  Categoría
-                </label>
-                <select
-                  value={category}
-                  onChange={e => setCategory(e.target.value as ManualCategory)}
-                  className="w-full px-3 py-2 rounded-lg bg-[#262835] border border-[#3e4153] text-sm text-white focus:outline-none focus:border-[#ca4048]"
-                >
-                  <option value="rrhh">Recursos Humanos (RRHH)</option>
-                  <option value="ti">Tecnología e Información (TI)</option>
-                  <option value="seguridad">Seguridad y Salud en el Trabajo (SST)</option>
-                  <option value="legal_etica">Legal, Ética y Cumplimiento</option>
-                  <option value="operaciones">Operaciones, Viajes y Viáticos</option>
-                  <option value="general">Políticas Generales</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-200 mb-1">
-                  Departamento Responsable
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Recursos Humanos, Prevención SST, etc."
-                  value={department}
-                  onChange={e => setDepartment(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[#262835] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
-                />
-              </div>
-            </div>
-
-            {/* Summary / Description */}
+          {/* Unified Fields for both Upload and Manual Creation */}
+          <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-200 mb-1">
-                Resumen Ejecutivo / Descripción General
+              <label className="block text-xs font-semibold text-slate-200 mb-1.5">
+                Título del Manual / Procedimiento *
               </label>
-              <textarea
-                rows={2}
-                placeholder="Breve descripción del alcance y propósito de este documento normativo..."
-                value={summary}
-                onChange={e => setSummary(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-[#262835] border border-[#3e4153] text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048] resize-none"
+              <input
+                type="text"
+                required
+                placeholder="Ej. Procedimiento de Control Foresta Residence"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#262835] border border-[#3e4153] text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#ca4048]"
               />
             </div>
 
-            {/* Sections / Articles (Accordion list) */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Artículos y Cláusulas ({sections.length})
-                  </h4>
-                  <p className="text-[11px] text-slate-400">
-                    Cada artículo es consultado por el asistente para citar respuestas oficiales
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddSection}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#262835] hover:bg-[#3e4153] text-white text-xs font-medium border border-[#3e4153] transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5 text-[#ca4048]" />
-                  <span>Agregar Artículo</span>
-                </button>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Información del Manual / Descripción *
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  Editor en tiempo real (Listas • puntos, 1,2,3 y a,b,c)
+                </span>
               </div>
-
-              {sections.length === 0 ? (
-                <div className="p-4 rounded-xl bg-[#262835] border border-[#3e4153] text-center text-xs text-slate-400">
-                  {activeTab === 'upload'
-                    ? 'Sube un archivo PDF o Word para autocompletar los artículos, o haz clic en "Agregar Artículo".'
-                    : 'Haz clic en "Agregar Artículo" para redactar las cláusulas del manual.'}
-                </div>
-              ) : (
-                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                  {sections.map((section, idx) => {
-                    const isExpanded = expandedSectionIndex === idx;
-
-                    return (
-                      <div
-                        key={section.id || idx}
-                        className="rounded-xl bg-[#262835] border border-[#3e4153] overflow-hidden transition-all"
-                      >
-                        <div
-                          onClick={() => setExpandedSectionIndex(isExpanded ? null : idx)}
-                          className="p-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-[#2f3140] transition-colors"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="px-2 py-0.5 rounded bg-[#ca4048]/20 text-[#ca4048] font-mono text-xs font-bold border border-[#ca4048]/30 shrink-0">
-                              {section.articleNumber || `Art. ${idx + 1}`}
-                            </span>
-                            <span className="text-xs font-bold text-white truncate">
-                              {section.title || `Artículo ${idx + 1}`}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleDeleteSection(idx);
-                              }}
-                              className="p-1 rounded text-slate-400 hover:text-[#ca4048] hover:bg-[#2f3140] transition-colors"
-                              title="Eliminar artículo"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4 text-slate-400" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-slate-400" />
-                            )}
-                          </div>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="p-3.5 border-t border-[#3e4153] bg-[#2f3140] space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-semibold text-slate-300 mb-1">
-                                  Número / Identificador
-                                </label>
-                                <input
-                                  type="text"
-                                  value={section.articleNumber}
-                                  onChange={e => handleSectionChange(idx, 'articleNumber', e.target.value)}
-                                  placeholder="Ej. Art. 4.1"
-                                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#262835] border border-[#3e4153] text-xs text-white focus:outline-none focus:border-[#ca4048]"
-                                />
-                              </div>
-                              <div className="sm:col-span-2">
-                                <label className="block text-[10px] font-semibold text-slate-300 mb-1">
-                                  Título de la Cláusula
-                                </label>
-                                <input
-                                  type="text"
-                                  value={section.title}
-                                  onChange={e => handleSectionChange(idx, 'title', e.target.value)}
-                                  placeholder="Ej. Procedimiento de Solicitud de Vacaciones"
-                                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#262835] border border-[#3e4153] text-xs text-white focus:outline-none focus:border-[#ca4048]"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-semibold text-slate-300 mb-1">
-                                Contenido Detallado
-                              </label>
-                              <textarea
-                                rows={4}
-                                value={section.content}
-                                onChange={e => handleSectionChange(idx, 'content', e.target.value)}
-                                placeholder="Escribe el texto de la normativa, pasos o condiciones..."
-                                className="w-full px-2.5 py-1.5 rounded-lg bg-[#262835] border border-[#3e4153] text-xs text-white focus:outline-none focus:border-[#ca4048] resize-y"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <RichTextEditor
+                content={contentHtml}
+                onChange={setContentHtml}
+                placeholder="Escribe o edita aquí toda la información del manual. Puedes usar listas con puntos (•), listas numeradas (1, 2, 3), listas alfabéticas (a, b, c), títulos y negritas..."
+              />
             </div>
           </div>
 
-          {/* Footer Submit */}
-          <div className="pt-4 border-t border-[#3e4153] flex items-center justify-end gap-3 sticky bottom-0 bg-[#2f3140]">
+          {/* Footer Buttons */}
+          <div className="pt-4 border-t border-[#3e4153] flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-[#3e4153] transition-colors"
+              className="px-4 py-2 rounded-xl bg-[#262835] hover:bg-[#3e4153] text-slate-200 text-xs font-medium transition-colors border border-[#3e4153] cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isUploading || !title.trim()}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md shadow-[#ca4048]/30 transition-all"
+              disabled={isUploading}
+              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#ca4048] hover:bg-[#b5343c] disabled:opacity-50 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>Guardar en el Book de la Empresa</span>
+              <span>{editingManual ? 'Guardar Cambios' : 'Guardar Manual'}</span>
             </button>
           </div>
         </form>

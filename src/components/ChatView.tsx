@@ -11,8 +11,7 @@ import {
   CheckCheck,
   ShieldCheck,
   MoreVertical,
-  LogOut,
-  Lock
+  LogOut
 } from 'lucide-react';
 import { ChatMessage, Citation, ManualDocument, ManualSection, UserChatThread } from '../types/manual';
 import { FormattedContent } from './FormattedContent';
@@ -127,7 +126,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               </h2>
             </div>
             <p className="text-[11px] text-white/90 font-medium truncate leading-tight mt-0.5">
-              Asistente STS Security
+              Asistente Control y Monitoreo
             </p>
             <div className="flex items-center gap-1 text-[10px] text-emerald-300 font-medium leading-tight mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -213,39 +212,46 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* =========================================================================
           CHAT FEED: Scrollable messages and cards
           ========================================================================= */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 space-y-4 bg-[#fff8f8] scrollbar-thin">
-        <div className={`space-y-4 ${!isPhone ? 'max-w-3xl mx-auto' : ''}`}>
-          {/* Date Divider Pill */}
-          <div className="flex justify-center select-none pt-1">
-            <span className="bg-rose-100/80 text-rose-600 text-[10px] sm:text-[11px] font-semibold px-3 py-0.5 rounded-full shadow-2xs">
-              Hoy
-            </span>
-          </div>
-
-          {/* Welcome Greeting Card */}
-          <div className="flex items-start gap-2.5 justify-start">
-            <RobotMascot size="sm" className="mt-1 shrink-0" />
-            <div className="max-w-[85%] bg-white border border-rose-100/90 text-slate-800 rounded-2xl rounded-tl-xs p-3.5 shadow-xs text-xs sm:text-sm space-y-1">
-              <h4 className="font-extrabold text-[#b82733] flex items-center gap-1">
-                <span>¡Hola! Soy AI-zen</span>
-                <span>👋</span>
-              </h4>
-              <p className="text-slate-600 leading-relaxed text-xs sm:text-sm">
-                Estoy aquí para ayudarte con turnos, sedes, personal autorizado, protocolos y manuales de STS Security.
-              </p>
-              <div className="text-[10px] text-slate-400 text-right pt-0.5">
-                10:30 AM
-              </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 bg-[#fff8f8] scrollbar-thin flex flex-col">
+        {activeThread.messages.length === 0 && !isLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-8 my-auto select-none animate-fade-in">
+            <div className="mb-4 relative">
+              <RobotMascot size="xl" />
             </div>
-          </div>
 
-          {/* Render Conversation Messages */}
-          {activeThread.messages.map(msg => {
-            const isUser = msg.role === 'user';
-            const formattedTime = new Date(msg.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit'
-            });
+            <div className="inline-flex items-center gap-1.5 bg-rose-100/90 text-[#b82733] text-xs font-bold px-3.5 py-1 rounded-full mb-3 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>AI-zen disponible ahora</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-[#b82733] tracking-tight leading-tight mb-3">
+              ¡Hola{loggedUserName && !isEmbedMode ? `, ${loggedUserName}` : ''}! Soy AI-zen 👋
+            </h1>
+
+            <p className="text-sm sm:text-lg font-medium text-slate-600 max-w-md leading-relaxed">
+              Estoy aquí para ayudarte con turnos, sedes, personal autorizado, protocolos y manuales de <span className="font-bold text-slate-800">STS Security</span>.
+            </p>
+
+            <p className="text-xs sm:text-sm text-rose-500/80 font-semibold mt-4">
+              Escribe tu consulta abajo para comenzar 👇
+            </p>
+          </div>
+        ) : (
+          <div className={`space-y-4 w-full ${!isPhone ? 'max-w-3xl mx-auto' : ''}`}>
+            {/* Date Divider Pill */}
+            <div className="flex justify-center select-none pt-1">
+              <span className="bg-rose-100/80 text-rose-600 text-[10px] sm:text-[11px] font-semibold px-3 py-0.5 rounded-full shadow-2xs">
+                Hoy
+              </span>
+            </div>
+
+            {/* Render Conversation Messages */}
+            {activeThread.messages.map(msg => {
+              const isUser = msg.role === 'user';
+              const formattedTime = new Date(msg.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+              });
 
             return (
               <div key={msg.id} className="space-y-1 select-text">
@@ -372,7 +378,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           )}
 
           <div ref={messagesEndRef} />
-        </div>
+          </div>
+        )}
       </div>
 
       {/* =========================================================================
@@ -410,12 +417,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <Send className="w-4 h-4 ml-0.5" />
             </button>
           </form>
-
-          {/* Privacy Note */}
-          <div className="text-[10px] text-rose-900/60 font-medium flex items-center justify-center gap-1 pt-1.5 select-none">
-            <Lock className="w-2.5 h-2.5 text-rose-800/60" />
-            <span>Tus consultas y datos son seguros y privados.</span>
-          </div>
         </div>
       </div>
     </div>

@@ -90,12 +90,22 @@
   margin-bottom: 0.6rem !important;
 }
 
+.tiptap ol[data-list-type="lower-alpha"],
+.tiptap ol[type="a"] {
+  list-style-type: lower-alpha !important;
+}
+
 .tiptap li {
   display: list-item !important;
   margin-top: 0.25rem !important;
   margin-bottom: 0.25rem !important;
   padding-left: 0.35rem !important;
   color: #f1f5f9 !important;
+}
+
+.tiptap li::marker {
+  color: #f87171 !important;
+  font-weight: 700 !important;
 }
 
 .tiptap li > p {

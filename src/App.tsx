@@ -61,20 +61,30 @@ export default function App() {
   const [drawerSection, setDrawerSection] = useState<ManualSection | null>(null);
 
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editingManual, setEditingManual] = useState<ManualDocument | null>(null);
   const [addModalInitialFile, setAddModalInitialFile] = useState<File | null>(null);
   const [addModalDefaultTab, setAddModalDefaultTab] = useState<'upload' | 'manual'>('upload');
   const [proposeModalOpen, setProposeModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleOpenUploadModal = () => {
+    setEditingManual(null);
     setAddModalInitialFile(null);
     setAddModalDefaultTab('upload');
     setAddModalOpen(true);
   };
 
   const handleUploadFileDirectly = (file: File) => {
+    setEditingManual(null);
     setAddModalInitialFile(file);
     setAddModalDefaultTab('upload');
+    setAddModalOpen(true);
+  };
+
+  const handleOpenEditManual = (manual: ManualDocument) => {
+    setEditingManual(manual);
+    setAddModalInitialFile(null);
+    setAddModalDefaultTab('manual');
     setAddModalOpen(true);
   };
 
@@ -153,22 +163,8 @@ export default function App() {
       })
       .catch(err => console.warn('Error loading proposals from Firestore:', err));
 
-    // 3. Load Chat Threads
-    getDocs(collection(db, 'chats'))
-      .then(snapshot => {
-        if (!snapshot.empty) {
-          const loadedThreads: UserChatThread[] = [];
-          snapshot.forEach(docSnap => {
-            loadedThreads.push(docSnap.data() as UserChatThread);
-          });
-          setThreads(loadedThreads);
-        } else {
-          DEFAULT_USER_THREADS.forEach(t => {
-            setDoc(doc(db, 'chats', t.userId), t).catch(console.warn);
-          });
-        }
-      })
-      .catch(err => console.warn('Error loading chats from Firestore:', err));
+    // 3. Start current-user chat fresh on session load so the large AI-zen greeting is displayed
+    setThreads(DEFAULT_USER_THREADS);
 
     // Status check
     fetch('/api/status')
@@ -357,6 +353,12 @@ export default function App() {
     showToast('Manual guardado en Firebase.');
   };
 
+  const handleUpdateManual = (updatedManual: ManualDocument) => {
+    setManuals(prev => prev.map(m => (m.id === updatedManual.id ? updatedManual : m)));
+    setDoc(doc(db, 'manuals', updatedManual.id), updatedManual).catch(console.warn);
+    showToast('Manual actualizado correctamente.');
+  };
+
   const handleDeleteManual = async (manualId: string) => {
     if (window.confirm('¿Estás seguro de eliminar este manual/procedimiento permanentemente?')) {
       // 1. Remove from state immediately
@@ -501,12 +503,14 @@ export default function App() {
               manuals={manuals}
               onOpenSection={handleOpenSection}
               onOpenAddModal={() => {
+                setEditingManual(null);
                 setAddModalInitialFile(null);
                 setAddModalDefaultTab('manual');
                 setAddModalOpen(true);
               }}
               onOpenUploadModal={handleOpenUploadModal}
               onUploadFile={handleUploadFileDirectly}
+              onEditManual={handleOpenEditManual}
               onResetManuals={handleResetManuals}
               onAskAboutManual={handleAskAboutManual}
               onDeleteManual={handleDeleteManual}
@@ -518,6 +522,8 @@ export default function App() {
               manuals={manuals}
               onOpenSection={handleOpenSection}
               onAskAboutSection={handleAskAboutSection}
+              onAskAboutManual={handleAskAboutManual}
+              onEditManual={handleOpenEditManual}
             />
           )}
 
@@ -567,9 +573,12 @@ export default function App() {
         isOpen={addModalOpen}
         onClose={() => {
           setAddModalOpen(false);
+          setEditingManual(null);
           setAddModalInitialFile(null);
         }}
         onAddManual={handleAddManual}
+        onUpdateManual={handleUpdateManual}
+        editingManual={editingManual}
         initialFile={addModalInitialFile}
         defaultTab={addModalDefaultTab}
       />

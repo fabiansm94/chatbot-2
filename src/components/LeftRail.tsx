@@ -74,7 +74,7 @@ export const LeftRail: React.FC<LeftRailProps> = ({
                 <BookOpen className="w-5 h-5 stroke-[2.2]" />
               </button>
 
-              {/* Article Explorer Tab */}
+              {/* Manuals Explorer Tab */}
               <button
                 type="button"
                 onClick={() => setActiveTab('explorer')}
@@ -83,8 +83,8 @@ export const LeftRail: React.FC<LeftRailProps> = ({
                     ? 'bg-white text-[#b82733] shadow-xl shadow-black/30 scale-105'
                     : 'text-white/80 hover:text-white hover:bg-white/15'
                 }`}
-                title="Buscador de Artículos y Normas"
-                aria-label="Buscador Rápido"
+                title="Todos los Manuales Añadidos"
+                aria-label="Todos los Manuales Añadidos"
               >
                 <Search className="w-5 h-5 stroke-[2.2]" />
               </button>
